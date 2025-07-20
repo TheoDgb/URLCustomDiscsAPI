@@ -5,7 +5,11 @@ const generateToken = require('../utils/tokenGenerator');
 const SERVERS_FILE = path.join(__dirname, '../data/servers.json');
 
 function loadServers() {
-    if (!fs.existsSync(SERVERS_FILE)) return {};
+    if (!fs.existsSync(SERVERS_FILE)) {
+        fs.mkdirSync(path.dirname(SERVERS_FILE), { recursive: true });
+        fs.writeFileSync(SERVERS_FILE, JSON.stringify({}, null, 2));
+        return {};
+    }
     return JSON.parse(fs.readFileSync(SERVERS_FILE, 'utf8'));
 }
 
