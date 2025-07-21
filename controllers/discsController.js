@@ -31,7 +31,8 @@ exports.registerMcServer = async (req, res) => {
     try {
         await copyAndUploadPack(token);
         console.log('[REGISTER] New token generated and pack uploaded:', token);
-        res.json({ token });
+        const downloadPackUrl = `https://${process.env.R2_PUBLIC_URL}/${token}.zip`;
+        res.json({ token, downloadPackUrl });
     } catch (err) {
         console.error('[REGISTER] Failed to upload pack, rolling back token:', err);
         delete servers[token];

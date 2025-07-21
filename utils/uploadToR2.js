@@ -10,7 +10,7 @@ async function uploadFileToR2(localFilePath, remoteFileName) {
 
     const command = new PutObjectCommand({
         Bucket: BUCKET_NAME,
-        Key: `packs/${remoteFileName}`,
+        Key: remoteFileName,
         Body: fileStream,
         ContentType: 'application/zip',
     });
