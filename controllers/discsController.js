@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const generateToken = require('../utils/tokenGenerator');
+const copyAndUploadPack = require('../utils/copyAndUploadPack');
 
 const SERVERS_FILE = path.join(__dirname, '../data/servers.json');
 
@@ -17,7 +18,7 @@ function saveServers(data) {
     fs.writeFileSync(SERVERS_FILE, JSON.stringify(data, null, 2));
 }
 
-exports.registerMcServer = (req, res) => {
+exports.registerMcServer = async (req, res) => {
     const token = generateToken();
     const servers = loadServers();
 
@@ -27,8 +28,16 @@ exports.registerMcServer = (req, res) => {
 
     saveServers(servers);
 
-    console.log('[REGISTER] New token generated:', token);
-    res.json({ token });
+    try {
+        await copyAndUploadPack(token);
+        console.log('[REGISTER] New token generated and pack uploaded:', token);
+        res.json({ token });
+    } catch (err) {
+        console.error('[REGISTER] Failed to upload pack, rolling back token:', err);
+        delete servers[token];
+        saveServers(servers);
+        res.status(500).json({ error: 'Failed to upload pack. Token was not registered.' });
+    }
 };
 
 function isValidToken(token) {

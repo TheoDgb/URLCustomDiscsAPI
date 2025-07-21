@@ -6,5 +6,11 @@ Dedicated API for the URLCustomDiscs plugin, allowing the management of external
 npm init -y
 npm install express cors body-parser
 npm install uuid
+
+SDK AWS S3
+npm install @aws-sdk/client-s3
+
+npm install dotenv
+
 npm start
 ```
