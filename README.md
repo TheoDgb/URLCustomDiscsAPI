@@ -11,6 +11,8 @@ SDK AWS S3
 npm install @aws-sdk/client-s3
 
 npm install dotenv
+npm install tar
+npm install lzma-native
 
 npm start
 ```

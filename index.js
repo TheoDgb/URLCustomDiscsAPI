@@ -1,4 +1,5 @@
 require('dotenv').config();
+require('./scripts/setupBinaries');
 
 const express = require('express');
 const cors = require('cors');
