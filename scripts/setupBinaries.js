@@ -75,7 +75,7 @@ function getLocalYtDlpVersion() {
     try {
         return execSync(`${YT_DLP_PATH} --version`).toString().trim();
     } catch (err) {
-        return null; // Pas installé ou corrompu
+        return null; // Not installed or corrupted
     }
 }
 
@@ -125,6 +125,10 @@ async function setupFfmpeg() {
         const extractedDir = fs.readdirSync(BIN_DIR).find(d => d.startsWith('ffmpeg-') && d.endsWith('-static'));
         if (extractedDir) {
             fs.renameSync(path.join(BIN_DIR, extractedDir), FFMPEG_DIR);
+            const ffmpegBinaryPath = path.join(FFMPEG_DIR, 'ffmpeg');
+            if (fs.existsSync(ffmpegBinaryPath)) {
+                fs.chmodSync(ffmpegBinaryPath, 0o755);
+            }
         }
         fs.unlinkSync(FFMPEG_ARCHIVE);
     }
