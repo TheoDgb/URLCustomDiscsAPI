@@ -1,141 +1,232 @@
-const { execFile } = require('child_process');
-const { promisify } = require('util');
-const execFileAsync = promisify(execFile);
 const fs = require('fs');
 const path = require('path');
+
 const generateToken = require('../utils/tokenGenerator');
+const serverRegistry = require('../utils/serverRegistry');
 const copyAndUploadPack = require('../utils/copyAndUploadPack');
-
-const SERVERS_FILE = path.join(__dirname, '../data/servers.json');
-const YT_DLP_PATH = path.join(__dirname, '../bin/yt-dlp');
-const FFMPEG_PATH = path.join(__dirname, '../bin/ffmpeg/ffmpeg');
-const MUSIC_DIR = path.join(__dirname, '..', 'data', 'music');
-
-
+const audioManager = require('../utils/audioManager');
+const packManager = require('../utils/packManager');
+const checkR2Quota = require('../utils/checkR2Quota');
+const uploadPackToR2 = require('../utils/uploadPackToR2');
 
 // Register a Minecraft server
-function loadServers() {
-    if (!fs.existsSync(SERVERS_FILE)) {
-        fs.mkdirSync(path.dirname(SERVERS_FILE), { recursive: true });
-        fs.writeFileSync(SERVERS_FILE, JSON.stringify({}, null, 2));
-        return {};
-    }
-    return JSON.parse(fs.readFileSync(SERVERS_FILE, 'utf8'));
-}
-
-function saveServers(data) {
-    fs.writeFileSync(SERVERS_FILE, JSON.stringify(data, null, 2));
-}
-
 exports.registerMcServer = async (req, res) => {
     const token = generateToken();
-    const servers = loadServers();
-
-    servers[token] = {
-        registeredAt: new Date().toISOString()
-    };
-
-    saveServers(servers);
+    serverRegistry.registerToken(token);
 
     try {
         await copyAndUploadPack(token);
-        console.log('[REGISTER] New token generated and pack uploaded:', token);
         const downloadPackUrl = `https://${process.env.R2_PUBLIC_URL}/${token}.zip`;
-        res.json({ token, downloadPackUrl });
+        return res.status(200).json({
+            success: true,
+            message: 'Server registered successfully. Pack uploaded.',
+            token,
+            downloadPackUrl
+        });
     } catch (err) {
-        console.error('[REGISTER] Failed to upload pack, rolling back token:', err);
-        delete servers[token];
-        saveServers(servers);
-        res.status(500).json({ error: 'Failed to upload pack. Token was not registered.' });
+        serverRegistry.unregisterToken(token);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to upload pack. Token was not registered: ' + err.message
+        });
     }
 };
-
-function isValidToken(token) {
-    if (!fs.existsSync(SERVERS_FILE)) return false;
-    const servers = JSON.parse(fs.readFileSync(SERVERS_FILE, 'utf8'));
-    return token in servers;
-}
-
-
 
 // Add a new audio disc into the server resource pack
-async function getAudioInfo(url) {
-    // Retrieve JSON information from video/audio
-    try {
-        const { stdout } = await execFileAsync(YT_DLP_PATH, ['-j', '--no-playlist', url]);
-        const info = JSON.parse(stdout);
-
-        // Find the best audio format (bestaudio)
-        const audioFormats = info.formats.filter(f => f.acodec !== 'none' && f.vcodec === 'none');
-        // Take the best in quality
-        const bestAudio = audioFormats.sort((a, b) => b.abr - a.abr)[0];
-
-        return {
-            duration: info.duration, // in seconds
-            filesize: bestAudio.filesize || bestAudio.filesize_approx || 0 // in bytes, sometimes missing
-        };
-    } catch (err) {
-        throw new Error('Error retrieving audio information: ' + err.message);
-    }
-}
-
-async function downloadAndConvertAudio(url, discName, audioType) {
-    const mp3Path = path.join(MUSIC_DIR, discName + '.mp3');
-    const oggPath = path.join(MUSIC_DIR, discName + '.ogg');
-
-    if (!fs.existsSync(path.dirname(mp3Path))) {
-        fs.mkdirSync(path.dirname(mp3Path), { recursive: true });
-    }
-
-    // Delete old files if they exist
-    [mp3Path, oggPath].forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
-
-    // Download audio in mp3 with yt-dlp
-    await execFileAsync(YT_DLP_PATH, [
-        '-f', 'bestaudio[ext=m4a]/best',
-        '--audio-format', 'mp3',
-        '-o', mp3Path,
-        url
-    ]);
-
-    // Convert to ogg with ffmpeg
-    const ffmpegArgs = ['-i', mp3Path, '-c:a', 'libvorbis', oggPath];
-    if (audioType === 'mono') ffmpegArgs.splice(2, 0, '-ac', '1'); // insérer après -i mp3Path
-
-    await execFileAsync(FFMPEG_PATH, ffmpegArgs);
-
-    // Delete mp3
-    if (fs.existsSync(mp3Path)) fs.unlinkSync(mp3Path);
-
-    return oggPath;
-}
-
 exports.createCustomDisc = async (req, res) => {
-    const { url, discName, audioType, token } = req.body;
+    const { url, discName, audioType, customModelData, token } = req.body;
 
-    if (!isValidToken(token)) {
-        return res.status(401).json({ error: 'Invalid or missing token.' });
+    if (!serverRegistry.isValidToken(token)) {
+        return res.status(401).json({
+            success: false,
+            error: 'Invalid or missing token.'
+        });
     }
 
     try {
-        const info = await getAudioInfo(url);
+        let info;
+        try {
+            info = await audioManager.getAudioInfo(url);
+        } catch (err) {
+            console.error('[AUDIO INFO ERROR]', err);
+            return res.status(400).json({
+                success: false,
+                error: 'Failed to retrieve audio information: ' + err.message
+            });
+        }
 
         if (!info.duration || info.duration > 300) {
-            return res.status(400).json({ error: 'Audio duration exceeds 300 seconds limit.' });
+            return res.status(400).json({
+                success: false,
+                error: 'Audio duration exceeds 300 seconds limit.'
+            });
         }
-        if (!info.filesize || info.filesize > 10 * 1024 * 1024) {
-            return res.status(400).json({ error: 'Audio filesize exceeds 10 MB limit.' });
+
+        if (!info.duration || info.duration > 300) {
+            return res.status(400).json({
+                success: false,
+                error: 'Audio duration exceeds 300 seconds limit.'
+            });
         }
 
-        const oggPath = await downloadAndConvertAudio(url, discName, audioType);
+        let oggPath;
+        try {
+            oggPath = await audioManager.downloadAndConvertAudio(url, discName, audioType);
+        } catch (err) {
+            console.error('[AUDIO ERROR]', err);
+            return res.status(400).json({
+                success: false,
+                error: err.message
+            });
+        }
 
-        // NEXT
+        const tempDir = path.join(__dirname, '..', 'data', 'temp', token);
+        const zipPath = path.join(tempDir, `${token}.zip`);
+        try {
+            try {
+                await packManager.downloadPack(token, zipPath);
+            } catch (err) {
+                console.error('[DOWNLOAD PACK ERROR]', err);
+                return res.status(400).json({
+                    success: false,
+                    error: 'Failed to download resource pack: ' + err.message
+                });
+            }
 
-        res.json({ success: true, message: 'Disc created successfully.' });
+            let oldPackSize;
+            try {
+                const stats = await fs.promises.stat(zipPath);
+                oldPackSize = stats.size;
+            } catch (err) {
+                console.error('[STAT ZIP ERROR]', err);
+                return res.status(400).json({
+                    success: false,
+                    error: 'Cannot access downloaded zip: ' + err.message
+                });
+            }
+
+            const unpackedDir = path.join(tempDir, 'unpacked');
+            try {
+                await packManager.unzipPack(zipPath, unpackedDir);
+            } catch (err) {
+                console.error('[UNZIP ERROR]', err);
+                return res.status(400).json({
+                    success: false,
+                    error: 'Failed to unzip the resource pack: ' + err.message
+                });
+            }
+
+            try {
+                packManager.addOggToPack(oggPath, unpackedDir, discName);
+            } catch (err) {
+                console.error('[ADD OGG ERROR]', err);
+                return res.status(500).json({
+                    success: false,
+                    error: 'Failed to add OGG file to the resource pack: ' + err.message
+                });
+            }
+
+            try {
+                packManager.updateSoundsJson(unpackedDir, discName);
+            } catch (err) {
+                console.error('[UPDATE SOUNDS.JSON ERROR]', err);
+                return res.status(500).json({
+                    success: false,
+                    error: 'Failed to update sounds.json: ' + err.message
+                });
+            }
+
+            try {
+                packManager.updateDiscModelJson(unpackedDir, discName, customModelData);
+            } catch (err) {
+                console.error('[UPDATE DISC MODEL JSON ERROR]', err);
+                return res.status(500).json({
+                    success: false,
+                    error: 'Failed to update disc model JSON: ' + err.message
+                });
+            }
+
+            try {
+                packManager.createCustomMusicDiscModel(unpackedDir, discName);
+            } catch (err) {
+                console.error('[CREATE CUSTOM MUSIC DISC MODEL ERROR]', err);
+                return res.status(500).json({
+                    success: false,
+                    error: 'Failed to create custom music disc model: ' + err.message
+                });
+            }
+
+            try {
+                packManager.rezipPack(unpackedDir, zipPath);
+            } catch (err) {
+                console.error('[REZIP PACK ERROR]', err);
+                return res.status(500).json({
+                    success: false,
+                    error: 'Failed to rezip the resource pack: ' + err.message
+                });
+            }
+
+            let newPackSize;
+            try {
+                const result = checkR2Quota.checkR2Quota(zipPath);
+                newPackSize = result.packSize;
+            } catch (err) {
+                console.warn('[QUOTA CHECK ERROR]', err.message);
+                return res.status(400).json({
+                    success: false,
+                    error: err.message
+                });
+            }
+
+            try {
+                await uploadPackToR2(zipPath);
+            } catch (err) {
+                console.error('[UPLOAD ERROR]', err.message);
+                return res.status(500).json({
+                    success: false,
+                    error: 'Failed to upload pack to R2: ' + err.message
+                });
+            }
+
+            try {
+                checkR2Quota.updateQuotaAfterUpload(newPackSize, oldPackSize);
+            } catch (err) {
+                console.error('[QUOTA UPDATE ERROR]', err.message);
+                console.warn('Quota not updated properly. Manual fix might be needed.');
+            }
+        } catch (err) {
+            console.error('[PACK PROCESSING ERROR]', err);
+            return res.status(500).json({
+                success: false,
+                error: 'An unexpected error occurred during resource pack processing: ' + err.message
+            });
+        } finally {
+            if (oggPath && fs.existsSync(oggPath)) {
+                try {
+                    fs.unlinkSync(oggPath);
+                } catch (err) {
+                    console.warn('[CLEANUP WARNING] Failed to delete oggPath:', err.message);
+                }
+            }
+            if (fs.existsSync(tempDir)) {
+                try {
+                    fs.rmSync(tempDir, { recursive: true, force: true });
+                } catch (err) {
+                    console.warn('[CLEANUP WARNING] Failed to delete temp dir:', err.message);
+                }
+            }
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Disc created successfully.'
+        });
     } catch (err) {
-        console.error('[CREATE CUSTOM DISC] Error:', err);
-        res.status(500).json({ error: 'Failed to process the audio.' });
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to process the audio.'
+        });
     }
-
-    // TODO: add validation, queueing, saving...
 };
+
+// TODO: validation, queueing, pack size restriction

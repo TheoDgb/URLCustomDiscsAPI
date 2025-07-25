@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const uploadFileToR2 = require('./uploadToR2');
+const uploadPackToR2 = require('./uploadPackToR2');
+const { checkR2Quota, updateQuotaAfterUpload } = require('./checkR2Quota');
 
 const PACK_TEMPLATE_PATH = path.join(__dirname, '../data/URLCustomDiscsPack.zip');
 const TEMP_DIR = path.join(__dirname, '../data/temp');
@@ -12,14 +13,26 @@ async function copyAndUploadPack(token) {
 
     const tempZipPath = path.join(TEMP_DIR, `${token}.zip`);
 
-    // Copier le fichier
+    // Copy the template pack
     fs.copyFileSync(PACK_TEMPLATE_PATH, tempZipPath);
 
-    // Envoyer sur R2
-    await uploadFileToR2(tempZipPath, `${token}.zip`);
+    // Check quota before sending
+    const { packSize } = checkR2Quota(tempZipPath);
 
-    // Supprimer le fichier temporaire après upload
-    fs.unlinkSync(tempZipPath);
+    try {
+        // Upload to R2
+        await uploadPackToR2(tempZipPath, `${token}.zip`);
+
+        // Quota update only after successful upload
+        updateQuotaAfterUpload(packSize);
+    } catch (err) {
+        throw new Error(`Upload to R2 failed: ${err.message}`);
+    } finally {
+        // Delete the temporary pack
+        if (fs.existsSync(tempZipPath)) {
+            fs.unlinkSync(tempZipPath);
+        }
+    }
 }
 
 module.exports = copyAndUploadPack;

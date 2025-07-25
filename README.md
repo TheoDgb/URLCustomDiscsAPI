@@ -13,6 +13,8 @@ npm install @aws-sdk/client-s3
 npm install dotenv
 npm install tar
 npm install lzma-native
+npm install extract-zip
+npm install adm-zip
 
 npm start
 ```
