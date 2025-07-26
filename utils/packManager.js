@@ -111,6 +111,71 @@ function createCustomMusicDiscModel(unpackedDir, discName) {
     }
 }
 
+function removeOggFromPack(unpackedDir, discName) {
+    try {
+        const oggPath = path.join(unpackedDir, 'assets', 'minecraft', 'sounds', 'custom', `${discName}.ogg`);
+        if (fs.existsSync(oggPath)) {
+            fs.unlinkSync(oggPath);
+        } else {
+            throw new Error(`OGG file not found: ${oggPath}`);
+        }
+    } catch (err) {
+        throw new Error(`Failed to remove OGG file: ${err.message}`);
+    }
+}
+
+function removeDiscFromSoundsJson(unpackedDir, discName) {
+    try {
+        const soundsJsonPath = path.join(unpackedDir, 'assets', 'minecraft', 'sounds.json');
+        if (!fs.existsSync(soundsJsonPath)) return;
+
+        const content = fs.readFileSync(soundsJsonPath, 'utf8');
+        const sounds = JSON.parse(content);
+
+        const key = `customdisc.${discName}`;
+        if (sounds[key]) {
+            delete sounds[key];
+            fs.writeFileSync(soundsJsonPath, JSON.stringify(sounds, null, 2));
+        } else {
+            throw new Error(`Entry ${key} not found in sounds.json`);
+        }
+    } catch (err) {
+        throw new Error(`Failed to remove entry from sounds.json: ${err.message}`);
+    }
+}
+
+function removeDiscModelJson(unpackedDir, discName) {
+    try {
+        const overrideModelPath = path.join(unpackedDir, 'assets', 'minecraft', 'models', 'item', 'music_disc_13.json');
+        const customModelPath = path.join(unpackedDir, 'assets', 'minecraft', 'models', 'item', `custom_music_disc_${discName}.json`);
+
+        // Supprimer le modèle individuel
+        if (fs.existsSync(customModelPath)) {
+            fs.unlinkSync(customModelPath);
+        }
+
+        // Supprimer l'override dans music_disc_13.json
+        if (fs.existsSync(overrideModelPath)) {
+            const content = fs.readFileSync(overrideModelPath, 'utf8');
+            const model = JSON.parse(content);
+
+            if (Array.isArray(model.overrides)) {
+                const before = model.overrides.length;
+                model.overrides = model.overrides.filter(o => o.model !== `item/custom_music_disc_${discName}`);
+                const after = model.overrides.length;
+
+                if (after < before) {
+                    fs.writeFileSync(overrideModelPath, JSON.stringify(model, null, 2));
+                } else {
+                    throw new Error(`Override for ${discName} not found`);
+                }
+            }
+        }
+    } catch (err) {
+        throw new Error(`Failed to remove disc model JSON: ${err.message}`);
+    }
+}
+
 function rezipPack(folderPath, outputZipPath) {
     try {
         const zip = new AdmZip();
@@ -128,5 +193,8 @@ module.exports = {
     updateSoundsJson,
     updateDiscModelJson,
     createCustomMusicDiscModel,
+    removeOggFromPack,
+    removeDiscFromSoundsJson,
+    removeDiscModelJson,
     rezipPack
 };
