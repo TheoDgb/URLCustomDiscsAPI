@@ -54,10 +54,12 @@ function updateSoundsJson(unpackedDir, discName) {
             sounds = JSON.parse(content);
         }
 
-        if (!sounds[`custom.${discName}`]) {
-            sounds[`custom.${discName}`] = {
+        const key = `customdisc.${discName}`;
+
+        if (!sounds[key]) {
+            sounds[key] = {
                 category: "record",
-                sounds: [{ name: `custom/${discName}` }]
+                sounds: [{ name: `custom/${discName}`, stream: true }]
             };
             fs.writeFileSync(soundsJsonPath, JSON.stringify(sounds, null, 2));
         }
