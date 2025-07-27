@@ -49,7 +49,7 @@ exports.createCustomDisc = async (req, res) => {
         });
     }
 
-    // Prevent request spamming: apply rate limiting per token (max 10 requests per minute)
+    // Prevent request spamming: apply rate limiting per token (max 6 requests per minute)
     if (isRateLimited(token)) {
         return res.status(429).json({ success: false, error: 'Too many requests, limit reached. Try again in a moment.' });
     }
@@ -279,7 +279,7 @@ exports.deleteCustomDisc = async (req, res) => {
         });
     }
 
-    // Prevent request spamming: apply rate limiting per token (max 10 requests per minute)
+    // Prevent request spamming: apply rate limiting per token (max 6 requests per minute)
     if (isRateLimited(token)) {
         return res.status(429).json({ success: false, error: 'Too many requests, limit reached. Try again in a moment.' });
     }

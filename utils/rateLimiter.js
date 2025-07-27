@@ -1,5 +1,5 @@
 const tokenRequests = new Map();
-const LIMIT = 11;
+const LIMIT = 7;
 const INTERVAL_MS = 60 * 1000; // 1 minute
 
 function isRateLimited(token) {
