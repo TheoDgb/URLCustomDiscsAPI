@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
+const enqueue = require('../utils/taskQueue');
 const generateToken = require('../utils/tokenGenerator');
 const serverRegistry = require('../utils/serverRegistry');
 const copyAndUploadPack = require('../utils/copyAndUploadPack');
@@ -37,7 +38,7 @@ exports.registerMcServer = async (req, res) => {
 
 // Add a new audio disc into the server resource pack
 exports.createCustomDisc = async (req, res) => {
-    const { url, discName, audioType, customModelData, token } = req.body;
+    const { token } = req.body;
 
     if (!serverRegistry.isValidToken(token)) {
         return res.status(401).json({
@@ -45,6 +46,19 @@ exports.createCustomDisc = async (req, res) => {
             error: 'Invalid or missing token.'
         });
     }
+
+    // Manage a request queue by token
+    enqueue(token, () => handleCreateCustomDisc(req.body, res)).catch(err => {
+        console.error('[QUEUE ERROR]', err);
+        res.status(500).json({
+            success: false,
+            error: 'Internal queue error.'
+        });
+    });
+};
+
+async function handleCreateCustomDisc(body, res) {
+    const { url, discName, audioType, customModelData, token } = body;
 
     try {
         let info;
@@ -251,11 +265,11 @@ exports.createCustomDisc = async (req, res) => {
             error: 'Failed to process the audio.'
         });
     }
-};
+}
 
 // Delete a custom disc from the server resource pack
 exports.deleteCustomDisc = async (req, res) => {
-    const { discName, token } = req.body;
+    const { token } = req.body;
 
     if (!serverRegistry.isValidToken(token)) {
         return res.status(401).json({
@@ -263,6 +277,19 @@ exports.deleteCustomDisc = async (req, res) => {
             error: 'Invalid or missing token.'
         });
     }
+
+    // Manage a request queue by token
+    enqueue(token, () => handleDeleteCustomDisc(req.body, res)).catch(err => {
+        console.error('[QUEUE ERROR]', err);
+        res.status(500).json({
+            success: false,
+            error: 'Internal queue error.'
+        });
+    });
+};
+
+async function handleDeleteCustomDisc(body, res) {
+    const { discName, token } = body;
 
     const tempDir = path.join(__dirname, '..', 'data', 'temp', token);
     const zipPath = path.join(tempDir, `${token}.zip`);
@@ -381,4 +408,4 @@ exports.deleteCustomDisc = async (req, res) => {
             }
         }
     }
-};
+}
