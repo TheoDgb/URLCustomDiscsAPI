@@ -9,6 +9,9 @@ const packManager = require('../utils/packManager');
 const checkR2Quota = require('../utils/checkR2Quota');
 const uploadPackToR2 = require('../utils/uploadPackToR2');
 
+const MAX_AUDIO_FILE_SIZE = 12 * 1024 * 1024;
+const MAX_PACK_SIZE = 120 * 1024 * 1024;
+
 // Register a Minecraft server
 exports.registerMcServer = async (req, res) => {
     const token = generateToken();
@@ -56,16 +59,21 @@ exports.createCustomDisc = async (req, res) => {
         }
 
         if (!info.duration || info.duration > 300) {
-            return res.status(400).json({
+            return res.status(409).json({
                 success: false,
-                error: 'Audio duration exceeds 300 seconds limit.'
+                error: !info.duration
+                    ? 'Unable to determine audio duration.'
+                    : 'Audio duration exceeds 5 minutes limit.'
             });
         }
 
-        if (!info.duration || info.duration > 300) {
-            return res.status(400).json({
+        const estimatedSize = info.filesize || info.filesize_approx;
+        if (!estimatedSize || estimatedSize > MAX_AUDIO_FILE_SIZE) {
+            return res.status(409).json({
                 success: false,
-                error: 'Audio duration exceeds 300 seconds limit.'
+                error: !estimatedSize
+                    ? 'Unable to determine audio file size.'
+                    : 'Audio file exceeds 12 MB size limit.'
             });
         }
 
@@ -113,6 +121,15 @@ exports.createCustomDisc = async (req, res) => {
                 return res.status(400).json({
                     success: false,
                     error: 'Failed to unzip the resource pack: ' + err.message
+                });
+            }
+
+            const audioDir = path.join(unpackedDir, 'assets', 'minecraft', 'sounds', 'custom');
+            const audioFiles = fs.readdirSync(audioDir).filter(f => f.endsWith('.ogg'));
+            if (audioFiles.length >= 10) {
+                return res.status(409).json({
+                    success: false,
+                    error: 'Resource pack already contains 10 custom discs.'
                 });
             }
 
@@ -178,6 +195,13 @@ exports.createCustomDisc = async (req, res) => {
                 });
             }
 
+            if (newPackSize > MAX_PACK_SIZE) {
+                return res.status(409).json({
+                    success: false,
+                    error: 'Resource pack exceeds 200 MB size limit.'
+                });
+            }
+
             try {
                 await uploadPackToR2(zipPath);
             } catch (err) {
@@ -228,8 +252,6 @@ exports.createCustomDisc = async (req, res) => {
         });
     }
 };
-
-// TODO: validation, queueing, pack size restriction
 
 // Delete a custom disc from the server resource pack
 exports.deleteCustomDisc = async (req, res) => {
@@ -360,3 +382,5 @@ exports.deleteCustomDisc = async (req, res) => {
         }
     }
 };
+
+// TODO: validation, queueing, pack size restriction
