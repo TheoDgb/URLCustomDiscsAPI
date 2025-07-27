@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const enqueue = require('../utils/taskQueue');
+const isRateLimited = require('../utils/rateLimiter');
 const generateToken = require('../utils/tokenGenerator');
 const serverRegistry = require('../utils/serverRegistry');
 const copyAndUploadPack = require('../utils/copyAndUploadPack');
@@ -46,6 +47,11 @@ exports.createCustomDisc = async (req, res) => {
             success: false,
             error: 'Invalid or missing token.'
         });
+    }
+
+    // Prevent request spamming: apply rate limiting per token (max 10 requests per minute)
+    if (isRateLimited(token)) {
+        return res.status(429).json({ success: false, error: 'Too many requests, limit reached. Try again in a moment.' });
     }
 
     // Manage a request queue by token
@@ -271,6 +277,11 @@ exports.deleteCustomDisc = async (req, res) => {
             success: false,
             error: 'Invalid or missing token.'
         });
+    }
+
+    // Prevent request spamming: apply rate limiting per token (max 10 requests per minute)
+    if (isRateLimited(token)) {
+        return res.status(429).json({ success: false, error: 'Too many requests, limit reached. Try again in a moment.' });
     }
 
     // Manage a request queue by token
