@@ -149,12 +149,12 @@ function removeDiscModelJson(unpackedDir, discName) {
         const overrideModelPath = path.join(unpackedDir, 'assets', 'minecraft', 'models', 'item', 'music_disc_13.json');
         const customModelPath = path.join(unpackedDir, 'assets', 'minecraft', 'models', 'item', `custom_music_disc_${discName}.json`);
 
-        // Supprimer le modèle individuel
+        // Delete individual template
         if (fs.existsSync(customModelPath)) {
             fs.unlinkSync(customModelPath);
         }
 
-        // Supprimer l'override dans music_disc_13.json
+        // Remove the override in music_disc_13.json
         if (fs.existsSync(overrideModelPath)) {
             const content = fs.readFileSync(overrideModelPath, 'utf8');
             const model = JSON.parse(content);

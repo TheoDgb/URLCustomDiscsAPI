@@ -1,5 +1,6 @@
-/node_modules/
+/bin/
+/data/temp/
 /data/quota.json
 /data/servers.json
+/node_modules/
 /.env
-/bin/

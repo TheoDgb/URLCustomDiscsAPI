@@ -10,6 +10,7 @@ const packManager = require('../utils/packManager');
 const checkR2Quota = require('../utils/checkR2Quota');
 const uploadPackToR2 = require('../utils/uploadPackToR2');
 
+const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
 const MAX_AUDIO_FILE_SIZE = 12 * 1024 * 1024;
 const MAX_PACK_SIZE = 120 * 1024 * 1024;
 
@@ -20,7 +21,7 @@ exports.registerMcServer = async (req, res) => {
 
     try {
         await copyAndUploadPack(token);
-        const downloadPackUrl = `https://${process.env.R2_PUBLIC_URL}/${token}.zip`;
+        const downloadPackUrl = `https://${R2_PUBLIC_URL}/${token}.zip`;
         return res.status(200).json({
             success: true,
             message: 'Server registered successfully. Pack uploaded.',
@@ -91,20 +92,21 @@ async function handleCreateCustomDisc(body, res) {
             });
         }
 
-        let oggPath;
-        try {
-            oggPath = await audioManager.downloadAndConvertAudio(url, discName, audioType);
-        } catch (err) {
-            console.error('[AUDIO ERROR]', err);
-            return res.status(400).json({
-                success: false,
-                error: err.message
-            });
-        }
-
         const tempDir = path.join(__dirname, '..', 'data', 'temp', token);
+        const tempAudioDir = path.join(tempDir, 'audios');
         const zipPath = path.join(tempDir, `${token}.zip`);
         try {
+            let oggPath;
+            try {
+                oggPath = await audioManager.downloadAndConvertAudio(url, discName, audioType, tempAudioDir);
+            } catch (err) {
+                console.error('[AUDIO ERROR]', err);
+                return res.status(400).json({
+                    success: false,
+                    error: err.message
+                });
+            }
+
             try {
                 await packManager.downloadPack(token, zipPath);
             } catch (err) {
@@ -239,13 +241,6 @@ async function handleCreateCustomDisc(body, res) {
                 error: 'An unexpected error occurred during resource pack processing: ' + err.message
             });
         } finally {
-            if (oggPath && fs.existsSync(oggPath)) {
-                try {
-                    fs.unlinkSync(oggPath);
-                } catch (err) {
-                    console.warn('[CLEANUP ERROR] Failed to delete oggPath:', err.message);
-                }
-            }
             if (fs.existsSync(tempDir)) {
                 try {
                     fs.rmSync(tempDir, { recursive: true, force: true });
