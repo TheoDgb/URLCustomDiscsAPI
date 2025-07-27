@@ -303,9 +303,9 @@ exports.deleteCustomDisc = async (req, res) => {
         try {
             packManager.removeOggFromPack(unpackedDir, discName);
         } catch (err) {
-            return res.status(400).json({
+            return res.status(409).json({
                 success: false,
-                error: 'Could not remove OGG: ' + err.message
+                error: `Disc "${discName}" was not found.`
             });
         }
 
@@ -382,5 +382,3 @@ exports.deleteCustomDisc = async (req, res) => {
         }
     }
 };
-
-// TODO: validation, queueing, pack size restriction
