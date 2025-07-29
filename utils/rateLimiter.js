@@ -1,5 +1,5 @@
 const tokenRequests = new Map();
-const LIMIT = 7;
+const LIMIT = 6; // max 6 requests per minute
 const INTERVAL_MS = 60 * 1000; // 1 minute
 
 function isRateLimited(token) {
@@ -9,7 +9,7 @@ function isRateLimited(token) {
     // Keep only queries within the time range
     const recentRequests = requests.filter(timestamp => now - timestamp < INTERVAL_MS);
 
-    if (recentRequests.length >= LIMIT) {
+    if (recentRequests.length > LIMIT) {
         return true;
     }
 

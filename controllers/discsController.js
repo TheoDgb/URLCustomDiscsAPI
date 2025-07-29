@@ -1,10 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const enqueue = require('../utils/taskQueue');
-const isRateLimited = require('../utils/rateLimiter');
 const generateToken = require('../utils/tokenGenerator');
 const serverRegistry = require('../utils/serverRegistry');
+const isRateLimited = require('../utils/rateLimiter');
+const { activeTokens, MAX_ACTIVE_TOKENS } = require('../utils/activeTokens');
+const enqueue = require('../utils/taskQueue');
 const copyAndUploadPack = require('../utils/copyAndUploadPack');
 const audioManager = require('../utils/audioManager');
 const packManager = require('../utils/packManager');
@@ -12,8 +13,8 @@ const checkR2Quota = require('../utils/checkR2Quota');
 const uploadPackToR2 = require('../utils/uploadPackToR2');
 
 const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
-const MAX_AUDIO_FILE_SIZE = 12 * 1024 * 1024;
-const MAX_PACK_SIZE = 120 * 1024 * 1024;
+const MAX_AUDIO_FILE_SIZE = 12 * 1024 * 1024; // 12 MB
+const MAX_PACK_SIZE = 80 * 1024 * 1024; // 80 MB
 
 // Register a Minecraft server
 exports.registerMcServer = async (req, res) => {
@@ -51,7 +52,18 @@ exports.createCustomDisc = async (req, res) => {
 
     // Prevent request spamming: apply rate limiting per token (max 6 requests per minute)
     if (isRateLimited(token)) {
-        return res.status(429).json({ success: false, error: 'Too many requests, limit reached. Try again in a moment.' });
+        return res.status(429).json({
+            success: false,
+            error: 'Too many requests. Limit reached. Try again in a moment.'
+        });
+    }
+
+    // Check global concurrency limit (max 2 active tokens)
+    if (!activeTokens.has(token) && activeTokens.size >= MAX_ACTIVE_TOKENS) {
+        return res.status(503).json({
+            success: false,
+            error: 'API is busy. Too many concurrent requests. Please try again shortly.'
+        });
     }
 
     // Manage a request queue by token
@@ -281,7 +293,18 @@ exports.deleteCustomDisc = async (req, res) => {
 
     // Prevent request spamming: apply rate limiting per token (max 6 requests per minute)
     if (isRateLimited(token)) {
-        return res.status(429).json({ success: false, error: 'Too many requests, limit reached. Try again in a moment.' });
+        return res.status(429).json({
+            success: false,
+            error: 'Too many requests, limit reached. Try again in a moment.'
+        });
+    }
+
+    // Check global concurrency limit (max 2 active tokens)
+    if (!activeTokens.has(token) && activeTokens.size >= MAX_ACTIVE_TOKENS) {
+        return res.status(503).json({
+            success: false,
+            error: 'API is busy. Too many concurrent requests. Please try again shortly.'
+        });
     }
 
     // Manage a request queue by token
