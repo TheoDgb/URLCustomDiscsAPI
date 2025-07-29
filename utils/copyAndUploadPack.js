@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const uploadPackToR2 = require('./uploadPackToR2');
+const r2Utils = require('./r2Utils');
 const { checkR2Quota, updateQuotaAfterUpload } = require('./checkR2Quota');
 
 const PACK_TEMPLATE_PATH = path.join(__dirname, '../data/URLCustomDiscsPack.zip');
@@ -21,7 +21,7 @@ async function copyAndUploadPack(token) {
 
     try {
         // Upload to R2
-        await uploadPackToR2(tempZipPath, `${token}.zip`);
+        await r2Utils.uploadPackToR2(tempZipPath, `${token}.zip`);
 
         // Quota update only after successful upload
         updateQuotaAfterUpload(packSize);

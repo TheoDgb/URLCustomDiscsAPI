@@ -10,7 +10,7 @@ const copyAndUploadPack = require('../utils/copyAndUploadPack');
 const audioManager = require('../utils/audioManager');
 const packManager = require('../utils/packManager');
 const checkR2Quota = require('../utils/checkR2Quota');
-const uploadPackToR2 = require('../utils/uploadPackToR2');
+const r2Utils = require('../utils/r2Utils');
 
 const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
 const MAX_AUDIO_FILE_SIZE = 12 * 1024 * 1024; // 12 MB
@@ -49,6 +49,8 @@ exports.createCustomDisc = async (req, res) => {
             error: 'Invalid or missing token.'
         });
     }
+
+    serverRegistry.updateLastActivity(token);
 
     // Prevent request spamming: apply rate limiting per token (max 6 requests per minute)
     if (isRateLimited(token)) {
@@ -237,7 +239,7 @@ async function handleCreateCustomDisc(body, res) {
             }
 
             try {
-                await uploadPackToR2(zipPath);
+                await r2Utils.uploadPackToR2(zipPath);
             } catch (err) {
                 console.error('[UPLOAD ERROR]', err.message);
                 return res.status(500).json({
@@ -290,6 +292,8 @@ exports.deleteCustomDisc = async (req, res) => {
             error: 'Invalid or missing token.'
         });
     }
+
+    serverRegistry.updateLastActivity(token);
 
     // Prevent request spamming: apply rate limiting per token (max 6 requests per minute)
     if (isRateLimited(token)) {
@@ -403,7 +407,7 @@ async function handleDeleteCustomDisc(body, res) {
         }
 
         try {
-            await uploadPackToR2(zipPath);
+            await r2Utils.uploadPackToR2(zipPath);
         } catch (err) {
             console.error('[UPLOAD ERROR]', err.message);
             return res.status(500).json({

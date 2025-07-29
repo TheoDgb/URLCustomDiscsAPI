@@ -41,14 +41,6 @@ function downloadFile(url, destination) {
     });
 }
 
-// async function setupYtDlp() {
-//     if (!fs.existsSync(YT_DLP_PATH)) {
-//         console.log('[SETUP] Downloading yt-dlp...');
-//         await downloadFile('https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux', YT_DLP_PATH);
-//         fs.chmodSync(YT_DLP_PATH, 0o755);
-//     }
-// }
-
 function fetchLatestYtDlpVersion() {
     return new Promise((resolve, reject) => {
         const options = {

@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { PutObjectCommand } = require('@aws-sdk/client-s3');
+const { PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const r2 = require('../utils/r2Client');
 
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
@@ -29,4 +29,20 @@ async function uploadPackToR2(localFilePath) {
     }
 }
 
-module.exports = uploadPackToR2;
+async function deletePackFromR2(fileName) {
+    const command = new DeleteObjectCommand({
+        Bucket: R2_BUCKET_NAME,
+        Key: fileName,
+    });
+
+    try {
+        await r2.send(command);
+    } catch (err) {
+        throw new Error(`Delete from R2 failed: ${err.message}`);
+    }
+}
+
+module.exports = {
+    uploadPackToR2,
+    deletePackFromR2
+};

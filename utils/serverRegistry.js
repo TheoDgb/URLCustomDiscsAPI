@@ -24,8 +24,20 @@ function isValidToken(token) {
 
 function registerToken(token) {
     const servers = loadServers();
-    servers[token] = { registeredAt: new Date().toISOString() };
+    const now = new Date().toISOString();
+    servers[token] = {
+        registeredAt: now,
+        lastActivityAt: now
+    };
     saveServers(servers);
+}
+
+function updateLastActivity(token) {
+    const servers = loadServers();
+    if (servers[token]) {
+        servers[token].lastActivityAt = new Date().toISOString();
+        saveServers(servers);
+    }
 }
 
 function unregisterToken(token) {
@@ -39,5 +51,6 @@ function unregisterToken(token) {
 module.exports = {
     isValidToken,
     registerToken,
+    updateLastActivity,
     unregisterToken
 };
