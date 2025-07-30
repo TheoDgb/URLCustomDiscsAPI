@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { deletePackFromR2 } = require('../utils/r2Utils');
 
-const SERVERS_FILE = path.join(__dirname, 'data', 'servers.json');
+const SERVERS_FILE = path.join(__dirname, '..', 'data', 'servers.json');
 const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000; // 90 jours
 
 function loadServers() {
@@ -28,12 +28,12 @@ async function cleanupInactiveTokens() {
             try {
                 await deletePackFromR2(`${token}.zip`);
                 console.log(`Deleted pack ${token}.zip from R2`);
+
+                delete servers[token];
+                changed = true;
             } catch (err) {
                 console.warn(`Failed to delete pack for token ${token}: ${err.message}`);
             }
-
-            delete servers[token];
-            changed = true;
         }
     }
 

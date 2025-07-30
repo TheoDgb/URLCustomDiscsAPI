@@ -234,7 +234,7 @@ async function handleCreateCustomDisc(body, res) {
             if (newPackSize > MAX_PACK_SIZE) {
                 return res.status(409).json({
                     success: false,
-                    error: 'Resource pack exceeds 200 MB size limit.'
+                    error: 'Resource pack exceeds 80 MB size limit.'
                 });
             }
 
@@ -299,7 +299,7 @@ exports.deleteCustomDisc = async (req, res) => {
     if (isRateLimited(token)) {
         return res.status(429).json({
             success: false,
-            error: 'Too many requests, limit reached. Try again in a moment.'
+            error: 'Too many requests. Limit reached. Try again in a moment.'
         });
     }
 
