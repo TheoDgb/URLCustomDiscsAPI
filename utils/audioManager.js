@@ -3,6 +3,8 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 
+const { setupYtDlp } = require('../scripts/setupBinaries');
+
 const execFileAsync = promisify(execFile);
 
 const YT_DLP_PATH = path.join(__dirname, '..', 'bin', 'yt-dlp');
@@ -52,7 +54,19 @@ async function downloadAndConvertAudio(url, discName, audioType = 'mono', tempAu
             url
         ]);
     } catch (err) {
-        throw new Error('Failed to download audio: ' + err.message);
+        // Update yt-dlp if needed
+        await setupYtDlp();
+        try {
+            // Retry once after update
+            await execFileAsync(YT_DLP_PATH, [
+                '-f', 'bestaudio[ext=m4a]/best',
+                '--audio-format', 'mp3',
+                '-o', mp3Path,
+                url
+            ]);
+        } catch (retryErr) {
+            throw new Error('Failed to download audio after yt-dlp update: ' + retryErr.message + 'Ensure you\'re using a valid YouTube URL without query parameters (remove everything after the & symbol).');
+        }
     }
 
     try {

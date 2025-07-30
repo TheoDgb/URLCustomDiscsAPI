@@ -1,5 +1,9 @@
+const fs = require('fs');
+const path = require('path');
+
 require('dotenv').config();
-require('./scripts/setupBinaries');
+
+const { setupBinaries } = require('./scripts/setupBinaries');
 
 const cron = require('node-cron');
 const cleanupInactiveTokens = require('./scripts/cleanupInactiveTokens');
@@ -9,6 +13,8 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 
 const discsRoutes = require('./routes/discsRoutes');
+
+const tempDir = path.join(__dirname, 'data', 'temp');
 
 const app = express();
 const port = process.env.PORT;
@@ -29,6 +35,22 @@ cron.schedule('0 3 * * 1', () => {
     timezone: 'America/New_York'
 });
 
-app.listen(port, '0.0.0.0', () => {
-    console.log(`URLCustomDiscs API listening on port ${port}`);
-});
+(async () => {
+    try {
+        await setupBinaries();
+
+        // Clean temporary files
+        if (fs.existsSync(tempDir)) {
+            fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+
+        // Start Express Server
+        app.listen(port, '0.0.0.0', () => {
+            console.log(`URLCustomDiscs API listening on port ${port}`);
+        });
+
+    } catch (err) {
+        console.error('Failed to setup application:', err);
+        process.exit(1);
+    }
+})();
