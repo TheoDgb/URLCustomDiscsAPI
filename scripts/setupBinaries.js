@@ -134,6 +134,17 @@ async function setupBinaries() {
     console.log('[SETUP] yt-dlp and ffmpeg are ready.');
 }
 
+// node scripts/setupBinaries.js
+if (require.main === module) {
+    (async () => {
+        console.log('[SETUP] Checking binaries...');
+        if (!fs.existsSync(BIN_DIR)) fs.mkdirSync(BIN_DIR);
+        await setupYtDlp();
+        await setupFfmpeg();
+        console.log('[SETUP] yt-dlp and ffmpeg are ready.');
+    })();
+}
+
 module.exports = {
     setupYtDlp,
     setupBinaries

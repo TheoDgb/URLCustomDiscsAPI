@@ -96,5 +96,8 @@ npm install extract-zip
 npm install adm-zip
 npm install node-cron
 
-npm start
+sudo npm start
+
+node scripts/setupBinaries.js
+node scripts/cleanupInactiveTokens.js
 ```

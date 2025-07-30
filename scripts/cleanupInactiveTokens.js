@@ -45,4 +45,11 @@ async function cleanupInactiveTokens() {
     }
 }
 
+// node scripts/cleanupInactiveTokens.js
+if (require.main === module) {
+    (async () => {
+        await cleanupInactiveTokens();
+    })();
+}
+
 module.exports = cleanupInactiveTokens;
