@@ -46,7 +46,7 @@ exports.createCustomDisc = async (req, res) => {
     if (!serverRegistry.isValidToken(token)) {
         return res.status(401).json({
             success: false,
-            error: 'Invalid or missing token.'
+            error: 'Invalid or missing token. A new token will be assigned to your Minecraft server upon your next custom disc creation request.'
         });
     }
 
@@ -289,7 +289,7 @@ exports.deleteCustomDisc = async (req, res) => {
     if (!serverRegistry.isValidToken(token)) {
         return res.status(401).json({
             success: false,
-            error: 'Invalid or missing token.'
+            error: 'Invalid or missing token. A new token will be assigned to your Minecraft server upon your next custom disc creation request.'
         });
     }
 
