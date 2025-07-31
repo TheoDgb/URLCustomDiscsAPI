@@ -56,8 +56,16 @@ function fetchLatestYtDlpVersion() {
             let data = '';
             res.on('data', chunk => data += chunk);
             res.on('end', () => {
-                const release = JSON.parse(data);
-                resolve(release.tag_name.replace(/^v/, ''));
+                try {
+                    const release = JSON.parse(data);
+                    if (release && release.tag_name) {
+                        resolve(release.tag_name.replace(/^v/, ''));
+                    } else {
+                        reject(new Error('Invalid GitHub API response: tag_name missing'));
+                    }
+                } catch (err) {
+                    reject(new Error(`Failed to parse GitHub response: ${err.message}`));
+                }
             });
         }).on('error', reject);
     });
