@@ -10,28 +10,49 @@ const execFileAsync = promisify(execFile);
 const YT_DLP_PATH = path.join(__dirname, '..', 'bin', 'yt-dlp');
 const FFMPEG_PATH = path.join(__dirname, '..', 'bin', 'ffmpeg', 'ffmpeg');
 
+async function tryGetAudioInfo(url) {
+    const { stdout } = await execFileAsync(YT_DLP_PATH, ['-j', '--no-playlist', url]);
+    const info = JSON.parse(stdout);
+
+    // Find the best audio format
+    const audioFormats = info.formats.filter(f => f.acodec !== 'none' && f.vcodec === 'none');
+
+    // Take the best in quality
+    const bestAudio = audioFormats.sort((a, b) => b.abr - a.abr)[0];
+
+    if (!bestAudio.filesize && !bestAudio.filesize_approx) {
+        console.warn('[AUDIO INFO WARNING] No filesize available for', url);
+    }
+
+    return {
+        duration: info.duration,
+        filesize: bestAudio.filesize || bestAudio.filesize_approx || null // in bytes, sometimes missing
+    };
+}
+
 async function getAudioInfo(url) {
     try {
-        const { stdout } = await execFileAsync(YT_DLP_PATH, ['-j', '--no-playlist', url]);
-        const info = JSON.parse(stdout);
-
-        // Find the best audio format
-        const audioFormats = info.formats.filter(f => f.acodec !== 'none' && f.vcodec === 'none');
-
-        // Take the best in quality
-        const bestAudio = audioFormats.sort((a, b) => b.abr - a.abr)[0];
-        if (!bestAudio.filesize && !bestAudio.filesize_approx) {
-            console.warn('[AUDIO INFO WARNING] No filesize available for', url);
-        }
-
-        return {
-            duration: info.duration,
-            filesize: bestAudio.filesize || bestAudio.filesize_approx || null // in bytes, sometimes missing
-        };
+        return await tryGetAudioInfo(url);
     } catch (err) {
-        const stderr = err.stderr ? `\nDetails: ${err.stderr.toString()}` : '';
-        throw new Error('Error retrieving audio information: ' + err.message + stderr);
+        console.warn('[AUDIO INFO WARNING] Initial yt-dlp call failed. Updating yt-dlp and retrying...');
+        try {
+            await setupYtDlp();
+            return await tryGetAudioInfo(url);
+        } catch (retryErr) {
+            const stderr = retryErr.stderr ? `\nDetails: ${retryErr.stderr.toString()}` : '';
+            throw new Error('Error retrieving audio information after yt-dlp update: ' + retryErr.message + stderr);
+        }
     }
+}
+
+async function tryDownloadAudio(url, outputPath) {
+    // Download MP3 audio with yt-dlp
+    await execFileAsync(YT_DLP_PATH, [
+        '-f', 'bestaudio[ext=m4a]/best',
+        '--audio-format', 'mp3',
+        '-o', outputPath,
+        url
+    ]);
 }
 
 async function downloadAndConvertAudio(url, discName, audioType = 'mono', tempAudioDir) {
@@ -46,26 +67,13 @@ async function downloadAndConvertAudio(url, discName, audioType = 'mono', tempAu
     if (fs.existsSync(oggPath)) fs.unlinkSync(oggPath);
 
     try {
-        // Download MP3 audio with yt-dlp
-        await execFileAsync(YT_DLP_PATH, [
-            '-f', 'bestaudio[ext=m4a]/best',
-            '--audio-format', 'mp3',
-            '-o', mp3Path,
-            url
-        ]);
+        await tryDownloadAudio(url, mp3Path);
     } catch (err) {
-        // Update yt-dlp if needed
         await setupYtDlp();
         try {
-            // Retry once after update
-            await execFileAsync(YT_DLP_PATH, [
-                '-f', 'bestaudio[ext=m4a]/best',
-                '--audio-format', 'mp3',
-                '-o', mp3Path,
-                url
-            ]);
+            await tryDownloadAudio(url, mp3Path);
         } catch (retryErr) {
-            throw new Error('Failed to download audio after yt-dlp update: ' + retryErr.message + 'Ensure you\'re using a valid YouTube URL without query parameters (remove everything after the & symbol).');
+            throw new Error('Failed to download audio after yt-dlp update: ' + retryErr.message + ' Ensure you\'re using a valid YouTube URL without query parameters (remove everything from the & symbol).');
         }
     }
 
