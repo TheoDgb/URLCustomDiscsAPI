@@ -61,10 +61,10 @@ function fetchLatestYtDlpVersion() {
                     if (release && release.tag_name) {
                         resolve(release.tag_name.replace(/^v/, ''));
                     } else {
-                        reject(new Error('Invalid GitHub API response: tag_name missing'));
+                        reject(new Error('Invalid yt-dlp GitHub API response: tag_name missing'));
                     }
                 } catch (err) {
-                    reject(new Error(`Failed to parse GitHub response: ${err.message}`));
+                    reject(new Error(`Failed to parse yt-dlp GitHub response: ${err.message}`));
                 }
             });
         }).on('error', reject);
