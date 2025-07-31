@@ -10,8 +10,13 @@ const execFileAsync = promisify(execFile);
 const YT_DLP_PATH = path.join(__dirname, '..', 'bin', 'yt-dlp');
 const FFMPEG_PATH = path.join(__dirname, '..', 'bin', 'ffmpeg', 'ffmpeg');
 
+const DEFAULT_YTDLP_ARGS = [
+    '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115 Safari/537.36',
+    '--no-playlist'
+];
+
 async function tryGetAudioInfo(url) {
-    const { stdout } = await execFileAsync(YT_DLP_PATH, ['-j', '--no-playlist', url]);
+    const { stdout } = await execFileAsync(YT_DLP_PATH, [...DEFAULT_YTDLP_ARGS, '-j', url]);
     const info = JSON.parse(stdout);
 
     // Find the best audio format
@@ -39,8 +44,13 @@ async function getAudioInfo(url) {
             await setupYtDlp();
             return await tryGetAudioInfo(url);
         } catch (retryErr) {
-            const stderr = retryErr.stderr ? `\nDetails: ${retryErr.stderr.toString()}` : '';
-            throw new Error('Error retrieving audio information after yt-dlp update: ' + retryErr.message + stderr);
+            const stderr = retryErr.stderr ? retryErr.stderr.toString() : '';
+
+            if (/sign in|403|age|consent/i.test(stderr)) {
+                throw new Error('This video is restricted and cannot be downloaded without login.');
+            }
+
+            throw new Error('Error retrieving audio information after yt-dlp update: ' + retryErr.message + `\nDetails: ${stderr}`);
         }
     }
 }
@@ -48,6 +58,7 @@ async function getAudioInfo(url) {
 async function tryDownloadAudio(url, outputPath) {
     // Download MP3 audio with yt-dlp
     await execFileAsync(YT_DLP_PATH, [
+        ...DEFAULT_YTDLP_ARGS,
         '-f', 'bestaudio[ext=m4a]/best',
         '--audio-format', 'mp3',
         '-o', outputPath,
@@ -73,7 +84,13 @@ async function downloadAndConvertAudio(url, discName, audioType = 'mono', tempAu
         try {
             await tryDownloadAudio(url, mp3Path);
         } catch (retryErr) {
-            throw new Error('Failed to download audio after yt-dlp update: ' + retryErr.message + ' Ensure you\'re using a valid YouTube URL without query parameters (remove everything from the & symbol).');
+            const stderr = retryErr.stderr ? retryErr.stderr.toString() : '';
+
+            if (/sign in|403|age|consent/i.test(stderr)) {
+                throw new Error('This video is restricted and cannot be downloaded without login.');
+            }
+
+            throw new Error('Failed to download audio after yt-dlp update: ' + retryErr.message + `\nDetails: ${stderr}`);
         }
     }
 
