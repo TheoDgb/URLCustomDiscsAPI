@@ -87,6 +87,14 @@ async function handleCreateCustomDisc(body, res) {
             info = await audioManager.getAudioInfo(url);
         } catch (err) {
             console.error('[AUDIO INFO ERROR]', err);
+
+            if (err.code === 419) {
+                return res.status(419).json({
+                    success: false,
+                    error: err.message
+                });
+            }
+
             return res.status(400).json({
                 success: false,
                 error: 'Failed to retrieve audio information: ' + err.message
@@ -121,6 +129,14 @@ async function handleCreateCustomDisc(body, res) {
                 oggPath = await audioManager.downloadAndConvertAudio(url, discName, audioType, tempAudioDir);
             } catch (err) {
                 console.error('[AUDIO ERROR]', err);
+
+                if (err.code === 419) {
+                    return res.status(419).json({
+                        success: false,
+                        error: err.message
+                    });
+                }
+
                 return res.status(400).json({
                     success: false,
                     error: err.message

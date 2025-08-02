@@ -11,29 +11,42 @@ const YT_DLP_PATH = path.join(__dirname, '..', 'bin', 'yt-dlp');
 const FFMPEG_PATH = path.join(__dirname, '..', 'bin', 'ffmpeg', 'ffmpeg');
 
 async function tryGetAudioInfo(url) {
-    const { stdout } = await execFileAsync(YT_DLP_PATH, ['-j', '--no-playlist', url]);
-    const info = JSON.parse(stdout);
+    try {
+        const {stdout} = await execFileAsync(YT_DLP_PATH, [
+            '--cookies', '/root/www.youtube.com_cookies.txt',
+            '-j', '--no-playlist', url
+        ]);
+        const info = JSON.parse(stdout);
 
-    // Find the best audio format
-    const audioFormats = info.formats.filter(f => f.acodec !== 'none' && f.vcodec === 'none');
+        // Find the best audio format
+        const audioFormats = info.formats.filter(f => f.acodec !== 'none' && f.vcodec === 'none');
 
-    // Take the best in quality
-    const bestAudio = audioFormats.sort((a, b) => b.abr - a.abr)[0];
+        // Take the best in quality
+        const bestAudio = audioFormats.sort((a, b) => b.abr - a.abr)[0];
 
-    if (!bestAudio.filesize && !bestAudio.filesize_approx) {
-        console.warn('[AUDIO INFO WARNING] No filesize available for', url);
+        if (!bestAudio.filesize && !bestAudio.filesize_approx) {
+            console.warn('[AUDIO INFO WARNING] No filesize available for', url);
+        }
+
+        return {
+            duration: info.duration,
+            filesize: bestAudio.filesize || bestAudio.filesize_approx || null // in bytes, sometimes missing
+        };
+    } catch (err) {
+        if (err.stderr && err.stderr.toString().includes('Sign in to confirm you’re not a bot')) {
+            const customErr = new Error('YouTube cookie expired, please notify the plugin owner via Discord: https://discord.gg/tdWztKWzcm');
+            customErr.code = 419;
+            throw customErr;
+        }
+        throw err;
     }
-
-    return {
-        duration: info.duration,
-        filesize: bestAudio.filesize || bestAudio.filesize_approx || null // in bytes, sometimes missing
-    };
 }
 
 async function getAudioInfo(url) {
     try {
         return await tryGetAudioInfo(url);
     } catch (err) {
+        if (err.code === 419) throw err; // YouTube cookie expired
         console.warn('[AUDIO INFO WARNING] Initial yt-dlp call failed. Updating yt-dlp and retrying...');
         try {
             await setupYtDlp();
@@ -47,12 +60,22 @@ async function getAudioInfo(url) {
 
 async function tryDownloadAudio(url, outputPath) {
     // Download MP3 audio with yt-dlp
-    await execFileAsync(YT_DLP_PATH, [
-        '-f', 'bestaudio[ext=m4a]/best',
-        '--audio-format', 'mp3',
-        '-o', outputPath,
-        url
-    ]);
+    try {
+        await execFileAsync(YT_DLP_PATH, [
+            '--cookies', '/root/www.youtube.com_cookies.txt',
+            '-f', 'bestaudio[ext=m4a]/best',
+            '--audio-format', 'mp3',
+            '-o', outputPath,
+            url
+        ]);
+    } catch (err) {
+        if (err.stderr && err.stderr.toString().includes('Sign in to confirm you’re not a bot')) {
+            const customErr = new Error('YouTube cookie expired, please notify the plugin owner via Discord: https://discord.gg/tdWztKWzcm');
+            customErr.code = 419;
+            throw customErr;
+        }
+        throw err;
+    }
 }
 
 async function downloadAndConvertAudio(url, discName, audioType = 'mono', tempAudioDir) {
@@ -69,6 +92,7 @@ async function downloadAndConvertAudio(url, discName, audioType = 'mono', tempAu
     try {
         await tryDownloadAudio(url, mp3Path);
     } catch (err) {
+        if (err.code === 419) throw err; // YouTube cookie expired
         await setupYtDlp();
         try {
             await tryDownloadAudio(url, mp3Path);

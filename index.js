@@ -22,6 +22,11 @@ const port = process.env.PORT;
 app.use(cors());
 app.use(bodyParser.json());
 
+app.get('/', (req, res) => {
+    console.log('GET / received');
+    res.send('API URLCustomDiscs is running.');
+});
+
 app.use('/', discsRoutes);
 
 // CRON JOB: Delete every Monday at 3AM tokens and Cloudflare packs that have been inactive for 3 months
@@ -34,6 +39,16 @@ cron.schedule('0 3 * * 1', () => {
     }, {
     timezone: 'America/New_York'
 });
+
+// // CRON JOB: Refresh cookies every 6 hours
+// cron.schedule('0 */6 * * *', () => {
+//     console.log('Running cookie refresh job...');
+//     cookieManager.refreshCookies()
+//         .then(() => console.log('Cookie refresh finished.'))
+//         .catch(err => console.error('Cookie refresh failed:', err));
+// }, {
+//     timezone: 'America/New_York'
+// });
 
 (async () => {
     try {

@@ -1,0 +1,14 @@
+/bin/
+/data/temp/
+/data/quota.json
+/data/servers.json
+/data/www.youtube.com_cookies.txt
+/node_modules/
+/.env
+
+/.idea/
+/.env.example
+/.gitignore
+/FORME.md
+/LICENSE.md
+/README.md
