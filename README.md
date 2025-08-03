@@ -1,11 +1,20 @@
 # URLCustomDiscsAPI
 ## About
-**API** for the **URLCustomDiscs** plugin, allowing **Minecraft servers** to register via a unique token and dynamically generate custom **resource packs** based on user-submitted URLs.  
-The **API** uses **yt-dlp** and **FFmpeg** to download and convert audio files, which are then added as custom audio discs (which can also be removed) to a dedicated **resource pack** hosted on Cloudflare R2.  
-This enables **Minecraft servers** to serve up-to-date custom discs in real time, allowing players to automatically receive new audio content without restarting or reinstalling anything.
+**URLCustomDiscsAPI** is the **remote service** that powers the [URLCustomDiscs](https://github.com/TheoDgb/URLCustomDiscs) Minecraft plugin. It is hosted on a **dedicated [Hetzner VPS](https://www.hetzner.com/)**, ensuring reliable performance and full control over all backend operations.
+
+When a Minecraft server makes its **first request** to the API, it is registered and receives a **unique token**. This token links the server to its **own isolated resource pack**, which is dynamically generated and updated based on audio URLs submitted by players. 
+
+The API manages the entire process:
+- It downloads audio from supported URLs using **yt-dlp** (with authentication cookie when required),
+- Converts the audio into Minecraft’s compatible format using **FFmpeg**,
+- Injects or removes tracks from the server's **dedicated resource pack**,
+- And finally, uploads this updated resource pack to **[Cloudflare R2](https://www.cloudflare.com/)**, a highly scalable cloud storage service used to securely host and distribute the packs.
+
+This setup allows each server to have a **private, persistent resource pack stored in the cloud**, enabling it to serve custom audio discs in **real time** without manual uploads, server restarts, or the need to host external tools like a HTTP server for serving the resource pack or installing and managing yt-dlp and FFmpeg locally.
+
 ## URLCustomDiscs Plugin
-The **URLCustomDiscs.jar** plugin is available for download in the [**Releases**](https://github.com/TheoDgb/URLCustomDiscs/releases) section of the [URLCustomDiscs GitHub repository](https://github.com/TheoDgb/URLCustomDiscs).  
-It is also available on [Modrinth](https://modrinth.com/plugin/url-custom-discs) ([**Versions**](https://modrinth.com/plugin/url-custom-discs/versions)).
+The **URLCustomDiscs.jar** plugin is available for download in the [Releases](https://github.com/TheoDgb/URLCustomDiscs/releases) section of the [URLCustomDiscs GitHub repository](https://github.com/TheoDgb/URLCustomDiscs).  
+It is also available on [Modrinth](https://modrinth.com/plugin/url-custom-discs).
 
 ## Dependencies
 ### License & Attribution
@@ -17,55 +26,58 @@ This **API** uses the following external tools:
 - **FFmpeg**: converts MP3 files to Ogg Vorbis format for Minecraft compatibility.
 
 ## Features
-- Register **Minecraft servers** and manage **resource packs**.
-- Dynamically add and remove custom audio discs.
-- Support for external tools **yt-dlp** and **FFmpeg** for audio downloading and conversion.
-- Automatic updates of **yt-dlp**.
-- Storage and hosting of **resource packs** via Cloudflare R2.
-- Maximum allowed **resource pack** size and custom discs per pack are both limited by the **API** to 80 MB and 10 custom discs respectively.
-- Active tokens limiting: only 2 **Minecraft servers** can process custom disc creation or deletion requests concurrently to reduce **API** memory usage and avoid overload.
-- Rate limiting and request queuing per **Minecraft server** token: to maintain **API** stability, each token is limited to 6 requests per minute and requests are processed sequentially.
-- Automatic cleanup of inactive tokens and **resource packs** after 3 months of inactivity.
+- **Token-based server isolation**: Each Minecraft server is assigned a unique token, linking it to its own private and isolated resource pack.
+- **Dynamic disc management**: Servers can add or remove custom audio discs at any time using the API, without restarts or manual uploads.
+- **Audio processing pipeline**: Audio is downloaded via **yt-dlp** (with an authentication cookie if needed), then converted to Ogg Vorbis using **FFmpeg** for Minecraft compatibility.
+- **Automatic yt-dlp updates**: Keeps yt-dlp up to date to maintain compatibility with platforms like YouTube.
+- **Cloud-based storage**: Resource packs are uploaded and served from **Cloudflare R2**, ensuring fast and scalable delivery.
+- **Scalable and reliable infrastructure**: Hosted on a dedicated **Hetzner VPS** with full control over processing and storage.
+- **Size limitations**: Enforces a maximum resource pack size of **80 MB**, a limit of **10 custom discs** per server, and a maximum **duration of 5 minutes per audio track**.
+- **Concurrent request management**: Only **2 server tokens** can have active creation or deletion requests at a time, reducing memory usage and avoiding overload.
+- **Rate limiting**: Each token is limited to **6 requests per minute** to prevent abuse and ensure system stability.
+- **Request queuing per token**: Ensures safe and ordered processing by handling one request at a time per server token.
+- **Automatic cleanup of inactive servers**: Tokens and resource packs are deleted after **90 days of inactivity** to free up resources.
+- **Robust error handling**: Clear JSON responses and meaningful HTTP status codes are returned for all success and failure cases.
 
 ## Token Authentication
-Every request to the **API** must include a token that uniquely identifies a registered **Minecraft server**.
-- Purpose: The token ensures that each **Minecraft server** has isolated access to its own **resource pack** and data.
+Every request to the API must include a token that uniquely identifies a registered Minecraft server.
+- Purpose: The token ensures that each Minecraft server has isolated access to its own resource pack and data.
 - Usage: The token must be included in the JSON body of the request.
-- Generated by: A unique token is generated and assigned when a **Minecraft server** registers for the first time by creating a custom disc.
+- Generated by: A unique token is generated and assigned when a Minecraft server registers for the first time by creating a custom disc.
 - Required for:
-  - Identifying the **Minecraft server** and its associated **resource pack**.
-  - Uploading or removing custom discs in the **resource pack**.
+  - Identifying the Minecraft server and its associated resource pack.
+  - Uploading or removing custom discs in the resource pack.
   - Enforcing active tokens concurrency limit for creation and deletion requests.
   - Applying rate limiting and managing request queues per token.
-  - Tracking **Minecraft servers** activity to enable automatic cleanup of unused tokens and **resource packs**.
+  - Tracking Minecraft servers activity to enable automatic cleanup of unused tokens and resource packs.
 
 ## Rate Limiting
-To prevent request spamming, the **API** enforces rate limiting per token:
+To prevent request spamming, the API enforces rate limiting per token:
 - Maximum 6 requests per minute per token.
-- If this limit is exceeded, the **API** doesn't add the request to the request queue.
+- If this limit is exceeded, the API doesn't add the request to the request queue.
 
 ## Active Tokens
-To reduce memory usage, the **API** allows a maximum of 2 active tokens (**Minecraft servers**) at the same time for custom disc creation and deletion requests.
+To reduce memory usage, the API allows a maximum of 2 active tokens (Minecraft servers) at the same time for custom disc creation and deletion requests.
 - Only 2 different server tokens can have pending requests being processed concurrently.
 - If more than 2 tokens send requests simultaneously, excess requests are ignored until one of the active tokens finishes.
 
 This prevents overload from too many concurrent audio conversions and **resource pack** updates.
 
 ## Request Queue
-To avoid conflicts when modifying **resource packs**, the **API** processes requests sequentially per token using a request queue:
+To avoid conflicts when modifying resource packs, the API processes requests sequentially per token using a request queue:
 - Requests for the same token are enqueued and processed in order.
 
-This ensures **resource pack** consistency and prevents race conditions.
+This ensures resource pack consistency and prevents race conditions.
 
 ## Inactive Token Cleanup
-To keep the **API** and storage clean, the system automatically removes inactive Minecraft server tokens and their corresponding **resource pack** from Cloudflare R2 if unused for over 3 months.
+To keep the API and storage clean, the system automatically removes inactive Minecraft server tokens and their corresponding resource pack from Cloudflare R2 if unused for over 3 months.
 - Activity includes: disc creation or deletion using the token.
 - If no activity is detected on a token after 90 days, the following cleanup occurs:
   - The token is unregistered from the system.
-  - The Minecraft server’s **resource pack** is deleted from Cloudflare R2.
+  - The Minecraft server’s resource pack is deleted from Cloudflare R2.
 - This cleanup runs automatically every Monday at 3:00 AM (America / New York timezone) using a scheduled cron job.
 
-This ensures that storage and server-side resources are used efficiently, and that inactive **Minecraft servers** don’t retain unnecessary data indefinitely.
+This ensures that storage and server-side resources are used efficiently, and that inactive Minecraft servers don’t retain unnecessary data indefinitely.
 
 ## API Response & Error Handling
 The **API** returns clear JSON responses indicating success or failure for each request.  
