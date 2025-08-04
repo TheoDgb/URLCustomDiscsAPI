@@ -1,4 +1,5 @@
 /bin/
+/data/mp3_uploads_temp/
 /data/temp/
 /data/quota.json
 /data/servers.json

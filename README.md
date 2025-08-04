@@ -107,6 +107,7 @@ npm install lzma-native
 npm install extract-zip
 npm install adm-zip
 npm install node-cron
+npm install multer
 
 sudo npm start
 

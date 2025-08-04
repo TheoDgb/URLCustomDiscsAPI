@@ -15,6 +15,7 @@ const bodyParser = require('body-parser');
 const discsRoutes = require('./routes/discsRoutes');
 
 const tempDir = path.join(__dirname, 'data', 'temp');
+const mp3UploadsTempDir = path.join(__dirname, 'data', 'mp3_uploads_temp');
 
 const app = express();
 const port = process.env.PORT;
@@ -57,6 +58,13 @@ cron.schedule('0 3 * * 1', () => {
         // Clean temporary files
         if (fs.existsSync(tempDir)) {
             fs.rmSync(tempDir, { recursive: true, force: true });
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        // Clean temporary upload MP3 files
+        if (fs.existsSync(mp3UploadsTempDir)) {
+            fs.rmSync(mp3UploadsTempDir, { recursive: true, force: true });
+            fs.mkdirSync(mp3UploadsTempDir, { recursive: true });
         }
 
         // Start Express Server

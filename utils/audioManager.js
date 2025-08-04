@@ -9,6 +9,7 @@ const execFileAsync = promisify(execFile);
 
 const YT_DLP_PATH = path.join(__dirname, '..', 'bin', 'yt-dlp');
 const FFMPEG_PATH = path.join(__dirname, '..', 'bin', 'ffmpeg', 'ffmpeg');
+const FFPROBE_PATH = path.join(__dirname, '..', 'bin', 'ffmpeg', 'ffprobe');
 
 async function tryGetAudioInfo(url) {
     try {
@@ -102,10 +103,10 @@ async function downloadAndConvertAudio(url, discName, audioType = 'mono', tempAu
     }
 
     try {
-        // Convert MP3 to OGG with FFmpeg
-        const ffmpegArgs = ['-i', mp3Path, '-c:a', 'libvorbis', oggPath];
-        if (audioType === 'mono') ffmpegArgs.splice(2, 0, '-ac', '1');
+        const ffmpegArgs = ['-i', mp3Path, '-vn', '-c:a', 'libvorbis', oggPath];
+        if (audioType === 'mono') ffmpegArgs.splice(3, 0, '-ac', '1');
 
+        // Convert MP3 to OGG with FFmpeg
         await execFileAsync(FFMPEG_PATH, ffmpegArgs);
     } catch (err) {
         throw new Error('Failed to convert audio to OGG: ' + err.message);
@@ -118,7 +119,68 @@ async function downloadAndConvertAudio(url, discName, audioType = 'mono', tempAu
     return oggPath;
 }
 
+async function getMp3AudioInfo(mp3FilePath) {
+    if (!fs.existsSync(mp3FilePath)) {
+        throw new Error('File not found: ' + mp3FilePath);
+    }
+
+    try {
+        const { stdout } = await execFileAsync(FFPROBE_PATH, [
+            '-v', 'error',
+            '-show_entries', 'format=duration,size,bit_rate',
+            '-of', 'json',
+            mp3FilePath
+        ]);
+        const probeResult = JSON.parse(stdout);
+        const format = probeResult.format || {};
+        const duration = parseFloat(format.duration) || 0;
+        const size = parseInt(format.size, 10) || 0;
+        const bitRate = parseInt(format.bit_rate, 10) || 0;
+
+        return {
+            duration,
+            filesize: size,
+            bitrate: bitRate
+        };
+    } catch (err) {
+        throw new Error('Error running ffprobe: ' + err.message);
+    }
+}
+
+async function convertMp3Audio(mp3FilePath, discName, audioType = 'mono', tempAudioDir) {
+    if (!fs.existsSync(mp3FilePath)) {
+        throw new Error('MP3 file not found: ' + mp3FilePath);
+    }
+
+    if (!fs.existsSync(tempAudioDir)) {
+        fs.mkdirSync(tempAudioDir, { recursive: true });
+    }
+
+    const oggPath = path.join(tempAudioDir, `${discName}.ogg`);
+
+    // Pre-cleaning
+    if (fs.existsSync(oggPath)) fs.unlinkSync(oggPath);
+
+    try {
+        // Convert MP3 to OGG with FFmpeg
+        const ffmpegArgs = ['-i', mp3FilePath, '-vn', '-c:a', 'libvorbis', oggPath];
+        if (audioType === 'mono') ffmpegArgs.splice(3, 0, '-ac', '1');
+
+        await execFileAsync(FFMPEG_PATH, ffmpegArgs);
+    } catch (err) {
+        throw new Error('Failed to convert MP3 to OGG: ' + err.message);
+    }
+
+    if (!fs.existsSync(oggPath)) {
+        throw new Error('OGG file not created.');
+    }
+
+    return oggPath;
+}
+
 module.exports = {
     getAudioInfo,
-    downloadAndConvertAudio
+    downloadAndConvertAudio,
+    getMp3AudioInfo,
+    convertMp3Audio
 };
