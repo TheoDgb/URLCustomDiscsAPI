@@ -11,12 +11,62 @@ const YT_DLP_PATH = path.join(__dirname, '..', 'bin', 'yt-dlp');
 const FFMPEG_PATH = path.join(__dirname, '..', 'bin', 'ffmpeg', 'ffmpeg');
 const FFPROBE_PATH = path.join(__dirname, '..', 'bin', 'ffmpeg', 'ffprobe');
 
+function detectPlatform(url) {
+    if (/youtube\.com|youtu\.be/.test(url)) return 'youtube';
+    if (/soundcloud\.com/.test(url)) return 'soundcloud';
+    return 'unknown';
+}
+
+function getYtDlpArgsForInfo(url) {
+    const platform = detectPlatform(url);
+    const baseArgs = ['-j', '--no-playlist'];
+
+    switch (platform) {
+        case 'youtube':
+            return ['--cookies', '/root/www.youtube.com_cookies.txt', ...baseArgs, url];
+        case 'soundcloud':
+            return baseArgs.concat(url);
+        default:
+            return baseArgs.concat(url);
+    }
+}
+
+function getYtDlpArgsForDownload(url, outputPath) {
+    const platform = detectPlatform(url);
+    const baseArgs = ['-o', outputPath];
+
+    switch (platform) {
+        case 'youtube':
+            return [
+                '--cookies', '/root/www.youtube.com_cookies.txt',
+                '-f', 'bestaudio[ext=m4a]/best',
+                '--audio-format', 'mp3',
+                ...baseArgs,
+                url
+            ];
+        case 'soundcloud':
+        case 'bandcamp':
+        case 'tiktok':
+            return [
+                '-f', 'bestaudio',
+                '--audio-format', 'mp3',
+                ...baseArgs,
+                url
+            ];
+        default:
+            throw new Error('Unsupported platform: ' + url);
+    }
+}
+
 async function tryGetAudioInfo(url) {
     try {
-        const {stdout} = await execFileAsync(YT_DLP_PATH, [
-            '--cookies', '/root/www.youtube.com_cookies.txt',
-            '-j', '--no-playlist', url
-        ]);
+        const args = getYtDlpArgsForInfo(url);
+        const { stdout } = await execFileAsync(YT_DLP_PATH, args);
+
+        // const {stdout} = await execFileAsync(YT_DLP_PATH, [
+        //     '--cookies', '/root/www.youtube.com_cookies.txt',
+        //     '-j', '--no-playlist', url
+        // ]);
         const info = JSON.parse(stdout);
 
         // Find the best audio format
@@ -62,13 +112,16 @@ async function getAudioInfo(url) {
 async function tryDownloadAudio(url, outputPath) {
     // Download MP3 audio with yt-dlp
     try {
-        await execFileAsync(YT_DLP_PATH, [
-            '--cookies', '/root/www.youtube.com_cookies.txt',
-            '-f', 'bestaudio[ext=m4a]/best',
-            '--audio-format', 'mp3',
-            '-o', outputPath,
-            url
-        ]);
+        const args = getYtDlpArgsForDownload(url, outputPath);
+        await execFileAsync(YT_DLP_PATH, args);
+
+        // await execFileAsync(YT_DLP_PATH, [
+        //     '--cookies', '/root/www.youtube.com_cookies.txt',
+        //     '-f', 'bestaudio[ext=m4a]/best',
+        //     '--audio-format', 'mp3',
+        //     '-o', outputPath,
+        //     url
+        // ]);
     } catch (err) {
         if (err.stderr && err.stderr.toString().includes('Sign in to confirm you’re not a bot')) {
             const customErr = new Error('YouTube cookie expired, please notify the plugin owner via Discord: https://discord.gg/tdWztKWzcm');

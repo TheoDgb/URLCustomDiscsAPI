@@ -1,6 +1,6 @@
 const express = require('express');
 const multer = require('multer');
-const upload = multer({ dest: 'data/mp3_uploads_temp/' }); // Temp folder for mp3
+const upload = multer({ dest: 'data/mp3_uploads_temp/' });
 
 const router = express.Router();
 const {
