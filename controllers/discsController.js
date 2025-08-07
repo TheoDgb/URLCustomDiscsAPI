@@ -19,11 +19,12 @@ const MAX_PACK_SIZE = 80 * 1024 * 1024; // 80 MB
 
 // Register a Minecraft server
 exports.registerMcServer = async (req, res) => {
+    const { minecraftServerVersion } = req.body;
     const token = generateToken();
     serverRegistry.registerToken(token);
 
     try {
-        await copyAndUploadPack(token);
+        await copyAndUploadPack(token, minecraftServerVersion);
         const downloadPackUrl = `https://${R2_PUBLIC_URL}/${token}.zip`;
         return res.status(200).json({
             success: true,
@@ -80,7 +81,7 @@ exports.createCustomDisc = async (req, res) => {
 };
 
 async function handleCreateCustomDisc(body, res) {
-    const { url, discName, audioType, customModelData, token } = body;
+    const { url, discName, audioType, customModelData, token, minecraftServerVersion } = body;
 
     try {
         let info;
@@ -207,7 +208,7 @@ async function handleCreateCustomDisc(body, res) {
             }
 
             try {
-                packManager.updateDiscModelJson(unpackedDir, discName, customModelData);
+                packManager.updateDiscModelJson(unpackedDir, discName, customModelData, minecraftServerVersion);
             } catch (err) {
                 console.error('[UPDATE DISC MODEL JSON ERROR]', err);
                 return res.status(500).json({
@@ -217,7 +218,7 @@ async function handleCreateCustomDisc(body, res) {
             }
 
             try {
-                packManager.createCustomMusicDiscModel(unpackedDir, discName);
+                packManager.createCustomMusicDiscModel(unpackedDir, discName, minecraftServerVersion);
             } catch (err) {
                 console.error('[CREATE CUSTOM MUSIC DISC MODEL ERROR]', err);
                 return res.status(500).json({
@@ -301,7 +302,7 @@ async function handleCreateCustomDisc(body, res) {
 
 // Add a new audio disc into the server resource pack from MP3
 exports.createCustomDiscFromMp3 = async (req, res) => {
-    const { discName, audioType, customModelData, token } = req.body;
+    const { discName, audioType, customModelData, token, minecraftServerVersion } = req.body;
     const mp3File = req.file;
 
     if (!token || !serverRegistry.isValidToken(token)) {
@@ -340,6 +341,7 @@ exports.createCustomDiscFromMp3 = async (req, res) => {
         audioType,
         customModelData: parseInt(customModelData, 10),
         token,
+        minecraftServerVersion,
         mp3FilePath: mp3File.path // path to the uploaded MP3 temp file
     };
 
@@ -353,7 +355,7 @@ exports.createCustomDiscFromMp3 = async (req, res) => {
 }
 
 async function handleCreateCustomDiscFromMp3(body, res) {
-    const { mp3FilePath, discName, audioType, customModelData, token } = body;
+    const { mp3FilePath, discName, audioType, customModelData, token, minecraftServerVersion } = body;
 
     try {
         let info;
@@ -472,7 +474,7 @@ async function handleCreateCustomDiscFromMp3(body, res) {
             }
 
             try {
-                packManager.updateDiscModelJson(unpackedDir, discName, customModelData);
+                packManager.updateDiscModelJson(unpackedDir, discName, customModelData, minecraftServerVersion);
             } catch (err) {
                 console.error('[UPDATE DISC MODEL JSON ERROR]', err);
                 return res.status(500).json({
@@ -482,7 +484,7 @@ async function handleCreateCustomDiscFromMp3(body, res) {
             }
 
             try {
-                packManager.createCustomMusicDiscModel(unpackedDir, discName);
+                packManager.createCustomMusicDiscModel(unpackedDir, discName, minecraftServerVersion);
             } catch (err) {
                 console.error('[CREATE CUSTOM MUSIC DISC MODEL ERROR]', err);
                 return res.status(500).json({
@@ -612,7 +614,7 @@ exports.deleteCustomDisc = async (req, res) => {
 };
 
 async function handleDeleteCustomDisc(body, res) {
-    const { discName, token } = body;
+    const { discName, token, minecraftServerVersion } = body;
 
     const tempDir = path.join(__dirname, '..', 'data', 'temp', token);
     const zipPath = path.join(tempDir, `${token}.zip`);
@@ -669,7 +671,7 @@ async function handleDeleteCustomDisc(body, res) {
         }
 
         try {
-            packManager.removeDiscModelJson(unpackedDir, discName);
+            packManager.removeDiscModelJson(unpackedDir, discName, minecraftServerVersion);
         } catch (err) {
             console.warn('[MODEL JSON REMOVE WARNING]', err.message);
         }

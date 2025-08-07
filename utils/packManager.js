@@ -5,6 +5,31 @@ const extract = require('extract-zip');
 const AdmZip = require('adm-zip');
 
 const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
+const PACK_TEMPLATE_1_21_PATH = path.join(__dirname, '../data/serverResourcePacks/1_21/URLCustomDiscsPack.zip');
+const PACK_TEMPLATE_1_21_4_PATH = path.join(__dirname, '../data/serverResourcePacks/1_21_4/URLCustomDiscsPack.zip')
+
+function parseVersion(minecraftServerVersion) {
+    const parts = minecraftServerVersion.split('.').map(Number);
+    const major = parts[0] || 0;
+    const minor = parts[1] || 0;
+    const patch = parts[2] || 0; // 0 by default
+    return { major, minor, patch };
+}
+
+function selectPackTemplate(minecraftServerVersion) {
+    const { major, minor, patch } = parseVersion(minecraftServerVersion);
+
+    // From 1.21.4 and +, take the 1.21.4 pack
+    if (
+        major > 1 ||
+        (major === 1 && minor > 21) ||
+        (major === 1 && minor === 21 && patch >= 4)
+    ) {
+        return PACK_TEMPLATE_1_21_4_PATH;
+    }
+
+    return PACK_TEMPLATE_1_21_PATH;
+}
 
 function downloadPack(token, destinationPath) {
     return new Promise((resolve, reject) => {
@@ -68,43 +93,85 @@ function updateSoundsJson(unpackedDir, discName) {
     }
 }
 
-function updateDiscModelJson(unpackedDir, discName, customModelData) {
+function updateDiscModelJson(unpackedDir, discName, customModelData, minecraftServerVersion) {
+    const { major, minor, patch } = parseVersion(minecraftServerVersion);
+    const isNewFormat = (
+        major > 1 ||
+        (major === 1 && minor > 21) ||
+        (major === 1 && minor === 21 && patch >= 4)
+    );
+
     try {
-        const modelPath = path.join(unpackedDir, 'assets', 'minecraft', 'models', 'item', 'music_disc_13.json');
-        let model = { overrides: [] };
+        const modelPath = isNewFormat
+            ? path.join(unpackedDir, 'assets', 'minecraft', 'items', 'music_disc_13.json')
+            : path.join(unpackedDir, 'assets', 'minecraft', 'models', 'item', 'music_disc_13.json');
+
+        // initialize the model
+        let model = isNewFormat
+            ? { entries: [] }
+            : { overrides: [] };
 
         if (fs.existsSync(modelPath)) {
             const content = fs.readFileSync(modelPath, 'utf8');
             model = JSON.parse(content);
+
+            if (isNewFormat) {
+                if (!model.model.entries) model.model.entries = [];
+
+                const alreadyExists = model.model.entries.some(entry =>
+                    entry.threshold === customModelData
+                );
+
+                if (!alreadyExists) {
+                    model.model.entries.push({
+                        threshold: customModelData,
+                        model: {
+                            type: "model",
+                            model: `item/custom_music_disc_${discName}`
+                        }
+                    });
+                }
+            } else {
+                if (!model.overrides) model.overrides = [];
+
+                const alreadyExists = model.overrides.some(override =>
+                    override.predicate?.custom_model_data === customModelData
+                );
+
+                if (!alreadyExists) {
+                    model.overrides.push({
+                        predicate: { custom_model_data: customModelData },
+                        model: `item/custom_music_disc_${discName}`
+                    });
+                }
+            }
         }
-
-        if (!model.overrides) model.overrides = [];
-
-        const alreadyExists = model.overrides.some(override =>
-            override.predicate?.custom_model_data === customModelData
-        );
-
-        if (!alreadyExists) {
-            model.overrides.push({
-                predicate: { custom_model_data: customModelData },
-                model: `item/custom_music_disc_${discName}`
-            });
-            fs.writeFileSync(modelPath, JSON.stringify(model, null, 2));
-        }
+        fs.writeFileSync(modelPath, JSON.stringify(model, null, 2));
     } catch (err) {
         throw new Error(`Unable to update disc model JSON: ${err.message}`);
     }
 }
 
-function createCustomMusicDiscModel(unpackedDir, discName) {
+function createCustomMusicDiscModel(unpackedDir, discName, minecraftServerVersion) {
+    const { major, minor, patch } = parseVersion(minecraftServerVersion);
+    const isNewFormat = (
+        major > 1 ||
+        (major === 1 && minor > 21) ||
+        (major === 1 && minor === 21 && patch >= 4)
+    );
+
     try {
         const modelPath = path.join(unpackedDir, 'assets', 'minecraft', 'models', 'item', `custom_music_disc_${discName}.json`);
+
         const model = {
             parent: "minecraft:item/generated",
             textures: {
-                layer0: "minecraft:item/record_custom"
+                layer0: isNewFormat
+                    ? "item/record_custom" // no more `minecraft:` namespace for textures in 1.21.4+
+                    : "minecraft:item/record_custom"
             }
         };
+
         fs.writeFileSync(modelPath, JSON.stringify(model, null, 2));
     } catch (err) {
         throw new Error(`Unable to create custom music disc model: ${err.message}`);
@@ -144,30 +211,61 @@ function removeDiscFromSoundsJson(unpackedDir, discName) {
     }
 }
 
-function removeDiscModelJson(unpackedDir, discName) {
-    try {
-        const overrideModelPath = path.join(unpackedDir, 'assets', 'minecraft', 'models', 'item', 'music_disc_13.json');
-        const customModelPath = path.join(unpackedDir, 'assets', 'minecraft', 'models', 'item', `custom_music_disc_${discName}.json`);
+function removeDiscModelJson(unpackedDir, discName, minecraftServerVersion) {
+    const { major, minor, patch } = parseVersion(minecraftServerVersion);
+    const isNewFormat = (
+        major > 1 ||
+        (major === 1 && minor > 21) ||
+        (major === 1 && minor === 21 && patch >= 4)
+    );
 
-        // Delete individual template
+    try {
+        const customModelPath = path.join(unpackedDir, 'assets', 'minecraft', 'models', 'item', `custom_music_disc_${discName}.json`);
         if (fs.existsSync(customModelPath)) {
             fs.unlinkSync(customModelPath);
         }
 
-        // Remove the override in music_disc_13.json
-        if (fs.existsSync(overrideModelPath)) {
-            const content = fs.readFileSync(overrideModelPath, 'utf8');
-            const model = JSON.parse(content);
+        const modelPath = isNewFormat
+            ? path.join(unpackedDir, 'assets', 'minecraft', 'items', 'music_disc_13.json')
+            : path.join(unpackedDir, 'assets', 'minecraft', 'models', 'item', 'music_disc_13.json');
 
-            if (Array.isArray(model.overrides)) {
+        let model = isNewFormat
+            ? { model: { entries: [] } }
+            : { overrides: [] };
+
+        if (fs.existsSync(modelPath)) {
+            const content = fs.readFileSync(modelPath, 'utf8');
+            model = JSON.parse(content);
+
+            if (isNewFormat) {
+                if (!model.model?.entries || !Array.isArray(model.model.entries)) {
+                    model.model = { entries: [] };
+                }
+
+                const before = model.model.entries.length;
+                model.model.entries = model.model.entries.filter(entry =>
+                    entry.model?.model !== `item/custom_music_disc_${discName}`
+                );
+                const after = model.model.entries.length;
+
+                if (after < before) {
+                    fs.writeFileSync(modelPath, JSON.stringify(model, null, 2));
+                } else {
+                    throw new Error(`Entry for ${discName} not found in entries`);
+                }
+            } else {
+
+
                 const before = model.overrides.length;
-                model.overrides = model.overrides.filter(o => o.model !== `item/custom_music_disc_${discName}`);
+                model.overrides = model.overrides.filter(override =>
+                    override.model !== `item/custom_music_disc_${discName}`
+                );
                 const after = model.overrides.length;
 
                 if (after < before) {
-                    fs.writeFileSync(overrideModelPath, JSON.stringify(model, null, 2));
+                    fs.writeFileSync(modelPath, JSON.stringify(model, null, 2));
                 } else {
-                    throw new Error(`Override for ${discName} not found`);
+                    throw new Error(`Override for ${discName} not found in overrides`);
                 }
             }
         }
@@ -187,6 +285,7 @@ function rezipPack(folderPath, outputZipPath) {
 }
 
 module.exports = {
+    selectPackTemplate,
     downloadPack,
     unzipPack,
     addOggToPack,

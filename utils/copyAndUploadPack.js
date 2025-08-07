@@ -2,19 +2,20 @@ const fs = require('fs');
 const path = require('path');
 const r2Utils = require('./r2Utils');
 const { checkR2Quota, updateQuotaAfterUpload } = require('./checkR2Quota');
+const { selectPackTemplate } = require('./packManager');
 
-const PACK_TEMPLATE_PATH = path.join(__dirname, '../data/URLCustomDiscsPack.zip');
 const TEMP_DIR = path.join(__dirname, '../data/temp');
 
-async function copyAndUploadPack(token) {
+async function copyAndUploadPack(token, minecraftServerVersion) {
     if (!fs.existsSync(TEMP_DIR)) {
         fs.mkdirSync(TEMP_DIR, { recursive: true });
     }
 
+    const selectedPackPath = selectPackTemplate(minecraftServerVersion);
     const tempZipPath = path.join(TEMP_DIR, `${token}.zip`);
 
     // Copy the template pack
-    fs.copyFileSync(PACK_TEMPLATE_PATH, tempZipPath);
+    fs.copyFileSync(selectedPackPath, tempZipPath);
 
     // Check quota before sending
     const { packSize } = checkR2Quota(tempZipPath);
