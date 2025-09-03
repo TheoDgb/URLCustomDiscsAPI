@@ -23,11 +23,12 @@ async function cleanupInactiveTokens() {
         const lastActivity = new Date(data.lastActivityAt).getTime();
 
         if (now - lastActivity > THREE_MONTHS_MS) {
-            console.log(`Token ${token} is inactive. Cleaning up...`);
+            console.log("\x1b[94m%s\x1b[0m", `Token ${token} is inactive. Cleaning up...`);
+
 
             try {
                 await deletePackFromR2(`${token}.zip`);
-                console.log(`Deleted pack ${token}.zip from R2`);
+                console.log("\x1b[94m%s\x1b[0m", `Deleted pack ${token}.zip from R2`);
 
                 delete servers[token];
                 changed = true;
@@ -39,9 +40,9 @@ async function cleanupInactiveTokens() {
 
     if (changed) {
         saveServers(servers);
-        console.log('Updated servers.json after cleanup.');
+        console.log("\x1b[94m%s\x1b[0m", 'Updated servers.json after cleanup.');
     } else {
-        console.log('No inactive tokens to clean.');
+        console.log("\x1b[94m%s\x1b[0m", 'No inactive tokens to clean.');
     }
 }
 

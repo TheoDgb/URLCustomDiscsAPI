@@ -25,12 +25,12 @@ exports.registerMcServer = async (req, res) => {
 
     try {
         await copyAndUploadPack(token, minecraftServerVersion);
-        const downloadPackUrl = `https://${R2_PUBLIC_URL}/${token}.zip`;
+        const apiDownloadResourcePackURL = `https://${R2_PUBLIC_URL}/${token}.zip`;
         return res.status(200).json({
             success: true,
             message: 'Server registered successfully. Pack uploaded.',
             token,
-            downloadPackUrl
+            apiDownloadResourcePackURL
         });
     } catch (err) {
         serverRegistry.unregisterToken(token);
@@ -287,7 +287,8 @@ async function handleCreateCustomDisc(body, res) {
                 }
             }
         }
-
+        console.log("\x1b[92m%s\x1b[93m%s\x1b[0m", "New disc created with token: ", token);
+        console.log("\x1b[92m%s\x1b[95m%s\x1b[0m", "URL: ", url);
         return res.status(200).json({
             success: true,
             message: `Disc "${discName}" created successfully.`
@@ -561,7 +562,7 @@ async function handleCreateCustomDiscFromMp3(body, res) {
                 }
             }
         }
-
+        console.log("\x1b[92mNew " + "\x1b[93m" + discName + "\x1b[92m disc created with token: " + "\x1b[93m" + token + "\x1b[0m");
         return res.status(200).json({
             success: true,
             message: `Disc "${discName}" created successfully.`
@@ -714,7 +715,7 @@ async function handleDeleteCustomDisc(body, res) {
             console.error('[QUOTA UPDATE ERROR]', err.message);
             console.warn('Quota not updated properly. Manual fix might be needed.');
         }
-
+        console.log("\x1b[93m" + discName + "\x1b[92m disc deleted with token: " + "\x1b[93m" + token + "\x1b[0m");
         return res.status(200).json({
             success: true,
             message: `Disc "${discName}" deleted successfully.`
