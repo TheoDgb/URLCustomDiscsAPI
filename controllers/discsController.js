@@ -25,11 +25,13 @@ exports.registerMcServer = async (req, res) => {
 
     try {
         await copyAndUploadPack(token, minecraftServerVersion);
+        const downloadPackUrl = `https://${R2_PUBLIC_URL}/${token}.zip`; // DEPRECIATED (for old plugin versions v2.2.0 and v2.3.0) - intended to be removed
         const apiDownloadResourcePackURL = `https://${R2_PUBLIC_URL}/${token}.zip`;
         return res.status(200).json({
             success: true,
             message: 'Server registered successfully. Pack uploaded.',
             token,
+            downloadPackUrl, // DEPRECIATED (for old plugin versions v2.2.0 and v2.3.0) - intended to be removed
             apiDownloadResourcePackURL
         });
     } catch (err) {

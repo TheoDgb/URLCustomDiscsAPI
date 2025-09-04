@@ -11,6 +11,13 @@ const YT_DLP_PATH = path.join(__dirname, '..', 'bin', 'yt-dlp');
 const FFMPEG_PATH = path.join(__dirname, '..', 'bin', 'ffmpeg', 'ffmpeg');
 const FFPROBE_PATH = path.join(__dirname, '..', 'bin', 'ffmpeg', 'ffprobe');
 
+// Music platforms tested from the API
+// YouTube:     Works (but MAY BLOCK THE API so USE A COOKIE)
+// SoundCloud:  Works (for now)
+// Spotify:     Impossible (doesn't expose a public URL for audio files)
+// Bandcamp:    Can't retrieve audio infos
+// TikTok:      Can't retrieve audio infos
+
 function detectPlatform(url) {
     if (/youtube\.com|youtu\.be/.test(url)) return 'youtube';
     if (/soundcloud\.com/.test(url)) return 'soundcloud';
@@ -33,7 +40,7 @@ function getYtDlpArgsForInfo(url) {
 
 function getYtDlpArgsForDownload(url, outputPath) {
     const platform = detectPlatform(url);
-    const baseArgs = ['-o', outputPath];
+    const baseArgs = ['--no-playlist', '-o', outputPath];
 
     switch (platform) {
         case 'youtube':
@@ -47,14 +54,14 @@ function getYtDlpArgsForDownload(url, outputPath) {
         case 'soundcloud':
         case 'bandcamp':
         case 'tiktok':
+        default:
             return [
                 '-f', 'bestaudio',
                 '--audio-format', 'mp3',
                 ...baseArgs,
                 url
             ];
-        default:
-            throw new Error('Unsupported platform: ' + url);
+            // throw new Error('Unsupported platform: ' + url);
     }
 }
 
@@ -62,11 +69,11 @@ async function tryGetAudioInfo(url) {
     try {
         const args = getYtDlpArgsForInfo(url);
         const { stdout } = await execFileAsync(YT_DLP_PATH, args);
-
         // const {stdout} = await execFileAsync(YT_DLP_PATH, [
         //     '--cookies', '/root/www.youtube.com_cookies.txt',
         //     '-j', '--no-playlist', url
         // ]);
+
         const info = JSON.parse(stdout);
 
         // Find the best audio format
@@ -114,7 +121,6 @@ async function tryDownloadAudio(url, outputPath) {
     try {
         const args = getYtDlpArgsForDownload(url, outputPath);
         await execFileAsync(YT_DLP_PATH, args);
-
         // await execFileAsync(YT_DLP_PATH, [
         //     '--cookies', '/root/www.youtube.com_cookies.txt',
         //     '-f', 'bestaudio[ext=m4a]/best',
@@ -122,6 +128,7 @@ async function tryDownloadAudio(url, outputPath) {
         //     '-o', outputPath,
         //     url
         // ]);
+
     } catch (err) {
         if (err.stderr && err.stderr.toString().includes('Sign in to confirm you’re not a bot')) {
             const customErr = new Error('YouTube cookie expired, please notify the plugin owner via Discord: https://discord.gg/tdWztKWzcm');
