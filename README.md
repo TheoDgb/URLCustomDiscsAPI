@@ -19,17 +19,19 @@ It is also available on [Modrinth](https://modrinth.com/plugin/url-custom-discs)
 ## Dependencies
 ### License & Attribution
 This **API** uses the following external tools:
+- **Deno**, from the [Deno GitHub repository](https://github.com/denoland/deno), licensed under the [MIT License](https://github.com/denoland/deno/blob/main/LICENSE.md)
 - **yt-dlp**, from the [yt-dlp GitHub repository](https://github.com/yt-dlp/yt-dlp), licensed under the [Unlicense](https://github.com/yt-dlp/yt-dlp/blob/master/LICENSE)
 - **FFmpeg**, from the [FFmpeg Static Builds](https://johnvansickle.com/ffmpeg/), licensed under the [GNU General Public License version 3 (GPLv3)](https://www.gnu.org/licenses/gpl-3.0.html)
 ### Tool Usage
-- **yt-dlp**: downloads MP3 audio files from YouTube URLs.
-- **FFmpeg**: converts MP3 files to Ogg Vorbis format for Minecraft compatibility.
+- **Deno** is used by yt-dlp to interpret YouTube’s JavaScript and decrypt its signature cipher, which is required to extract and download audio data from YouTube.
+- **yt-dlp** downloads MP3 audio files from YouTube URLs.
+- **FFmpeg** converts MP3 files to Ogg Vorbis format for Minecraft compatibility.
 
 ## Features
 - **Token-based server isolation**: Each Minecraft server is assigned a unique token, linking it to its own private and isolated resource pack.
 - **Dynamic disc management**: Servers can add or remove custom audio discs at any time using the API, without restarts or manual uploads.
 - **Audio processing pipeline**: Audio is downloaded via **yt-dlp** (with an authentication cookie if needed), then converted to Ogg Vorbis using **FFmpeg** for Minecraft compatibility.
-- **Automatic yt-dlp updates**: Keeps yt-dlp up to date to maintain compatibility with platforms like YouTube.
+- **Automatic deno and yt-dlp updates**: Keeps deno and yt-dlp up to date to maintain compatibility with platforms like YouTube.
 - **Cloud-based storage**: Resource packs are uploaded and served from **Cloudflare R2**, ensuring fast and scalable delivery.
 - **Scalable and reliable infrastructure**: Hosted on a dedicated **Hetzner VPS** with full control over processing and storage.
 - **Size limitations**: Enforces a maximum resource pack size of **80 MB**, a limit of **10 custom discs** per server, and a maximum **duration of 5 minutes per audio track**.
@@ -98,7 +100,7 @@ npm init -y
 npm install express cors body-parser
 npm install uuid
 
-SDK AWS S3
+# SDK AWS S3
 npm install @aws-sdk/client-s3
 
 npm install dotenv
@@ -108,6 +110,7 @@ npm install extract-zip
 npm install adm-zip
 npm install node-cron
 npm install multer
+npm install unzipper
 
 sudo npm start
 

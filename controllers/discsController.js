@@ -311,7 +311,7 @@ exports.createCustomDiscFromMp3 = async (req, res) => {
     if (!token || !serverRegistry.isValidToken(token)) {
         return res.status(401).json({
             success: false,
-            error: 'Invalid or missing token.'
+            error: 'Invalid or missing token. A new token will be assigned to your Minecraft server upon your next custom disc creation request.'
         });
     }
 

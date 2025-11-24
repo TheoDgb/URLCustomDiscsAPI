@@ -3,13 +3,14 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 
-const { setupYtDlp } = require('../scripts/setupBinaries');
+const { setupDeno, setupYtDlp } = require('../scripts/setupBinaries');
 
 const execFileAsync = promisify(execFile);
 
-const YT_DLP_PATH = path.join(__dirname, '..', 'bin', 'yt-dlp');
-const FFMPEG_PATH = path.join(__dirname, '..', 'bin', 'ffmpeg', 'ffmpeg');
-const FFPROBE_PATH = path.join(__dirname, '..', 'bin', 'ffmpeg', 'ffprobe');
+const BIN_DIR = path.join(__dirname, '..', 'bin');
+const YT_DLP_PATH = path.join(BIN_DIR, 'yt-dlp');
+const FFMPEG_PATH = path.join(BIN_DIR, 'ffmpeg', 'ffmpeg');
+const FFPROBE_PATH = path.join(BIN_DIR, 'ffmpeg', 'ffprobe');
 
 // Music platforms tested from the API
 // YouTube:     Works (but MAY BLOCK THE API so USE A COOKIE)
@@ -61,7 +62,7 @@ function getYtDlpArgsForDownload(url, outputPath) {
                 ...baseArgs,
                 url
             ];
-            // throw new Error('Unsupported platform: ' + url);
+        // throw new Error('Unsupported platform: ' + url);
     }
 }
 
@@ -105,13 +106,14 @@ async function getAudioInfo(url) {
         return await tryGetAudioInfo(url);
     } catch (err) {
         if (err.code === 419) throw err; // YouTube cookie expired
-        console.warn('[AUDIO INFO WARNING] Initial yt-dlp call failed. Updating yt-dlp and retrying...');
+        console.warn('[AUDIO INFO WARNING] Initial yt-dlp call failed. Updating Deno, yt-dlp and retrying...');
         try {
+            await setupDeno();
             await setupYtDlp();
             return await tryGetAudioInfo(url);
         } catch (retryErr) {
             const stderr = retryErr.stderr ? `\nDetails: ${retryErr.stderr.toString()}` : '';
-            throw new Error('Error retrieving audio information after yt-dlp update: ' + retryErr.message + stderr);
+            throw new Error('Error retrieving audio information after Deno and yt-dlp update: ' + retryErr.message + stderr);
         }
     }
 }
@@ -154,11 +156,12 @@ async function downloadAndConvertAudio(url, discName, audioType = 'mono', tempAu
         await tryDownloadAudio(url, mp3Path);
     } catch (err) {
         if (err.code === 419) throw err; // YouTube cookie expired
+        await setupDeno();
         await setupYtDlp();
         try {
             await tryDownloadAudio(url, mp3Path);
         } catch (retryErr) {
-            throw new Error('Failed to download audio after yt-dlp update: ' + retryErr.message + ' Ensure the URL is valid and clean.');
+            throw new Error('Failed to download audio after Deno and yt-dlp update: ' + retryErr.message + ' Ensure the URL is valid and clean.');
         }
     }
 

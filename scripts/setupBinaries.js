@@ -5,8 +5,11 @@ const { execSync } = require('child_process');
 const { createWriteStream } = require('fs');
 const lzma = require('lzma-native');
 const tar = require('tar');
+const unzipper = require('unzipper');
 
 const BIN_DIR = path.join(__dirname, '../bin');
+const DENO_ZIP = path.join(BIN_DIR, 'deno.zip');
+const DENO_PATH = path.join(BIN_DIR, 'deno');
 const YT_DLP_PATH = path.join(BIN_DIR, 'yt-dlp');
 const FFMPEG_ARCHIVE = path.join(BIN_DIR, 'ffmpeg.tar.xz');
 const FFMPEG_DIR = path.join(BIN_DIR, 'ffmpeg');
@@ -39,6 +42,73 @@ function downloadFile(url, destination) {
 
         handleRequest(url);
     });
+}
+
+async function fetchLatestDenoVersion() {
+    return new Promise((resolve, reject) => {
+        const options = {
+            hostname: 'api.github.com',
+            path: '/repos/denoland/deno/releases/latest',
+            headers: { 'User-Agent': 'Node.js' }
+        };
+        https.get(options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    const release = JSON.parse(data);
+                    if (release && release.tag_name) {
+                        resolve(release.tag_name.replace(/^v/, ''));
+                    } else {
+                        reject(new Error('Invalid Deno GitHub API response: tag_name missing'));
+                    }
+                } catch (err) {
+                    reject(err);
+                }
+            });
+        }).on('error', reject);
+    });
+}
+
+function getLocalDenoVersion() {
+    try {
+        const output = execSync(`${DENO_PATH} --version`).toString();
+        const versionLine = output.split('\n')[0];
+        const match = versionLine.match(/^deno\s+([\d.]+)/);
+        return match ? match[1] : null;
+    } catch {
+        return null;
+    }
+}
+
+async function setupDeno() {
+    const localVersion = getLocalDenoVersion();
+    const latestVersion = await fetchLatestDenoVersion();
+
+    console.log(`[SETUP] Local Deno version: ${localVersion || 'none'}`);
+    console.log(`[SETUP] Latest Deno version: ${latestVersion}`);
+
+    if (localVersion !== latestVersion) {
+        console.log('[SETUP] Updating Deno...');
+
+        if (fs.existsSync(DENO_PATH)) fs.unlinkSync(DENO_PATH);
+        await downloadFile(
+            'https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip',
+            DENO_ZIP
+        );
+
+        console.log('[SETUP] Extracting Deno...');
+        await fs.createReadStream(DENO_ZIP)
+            .pipe(unzipper.Extract({ path: BIN_DIR }))
+            .promise();
+
+        fs.unlinkSync(DENO_ZIP);
+        fs.chmodSync(DENO_PATH, 0o755);
+
+        console.log('[SETUP] Deno installed.');
+    } else {
+        console.log('[SETUP] Deno is up-to-date.');
+    }
 }
 
 function fetchLatestYtDlpVersion() {
@@ -119,7 +189,12 @@ async function extractTarXz(filePath, destDir) {
 async function setupFfmpeg() {
     if (!fs.existsSync(FFMPEG_DIR)) {
         console.log('[SETUP] Downloading ffmpeg...');
-        await downloadFile('https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz', FFMPEG_ARCHIVE);
+
+        await downloadFile(
+            'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz',
+            FFMPEG_ARCHIVE
+        );
+
         console.log('[SETUP] Extracting ffmpeg...');
         await extractTarXz(FFMPEG_ARCHIVE, BIN_DIR);
         const extractedDir = fs.readdirSync(BIN_DIR).find(d => d.startsWith('ffmpeg-') && d.endsWith('-static'));
@@ -137,9 +212,10 @@ async function setupFfmpeg() {
 async function setupBinaries() {
     console.log('[SETUP] Checking binaries...');
     if (!fs.existsSync(BIN_DIR)) fs.mkdirSync(BIN_DIR);
+    await setupDeno();
     await setupYtDlp();
     await setupFfmpeg();
-    console.log('[SETUP] yt-dlp and ffmpeg are ready.');
+    console.log('[SETUP] deno, yt-dlp and ffmpeg are ready.');
 }
 
 // node scripts/setupBinaries.js
@@ -147,13 +223,15 @@ if (require.main === module) {
     (async () => {
         console.log('[SETUP] Checking binaries...');
         if (!fs.existsSync(BIN_DIR)) fs.mkdirSync(BIN_DIR);
+        await setupDeno();
         await setupYtDlp();
         await setupFfmpeg();
-        console.log('[SETUP] yt-dlp and ffmpeg are ready.');
+        console.log('[SETUP] deno, yt-dlp and ffmpeg are ready.');
     })();
 }
 
 module.exports = {
+    setupDeno,
     setupYtDlp,
     setupBinaries
 };
